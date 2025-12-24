@@ -1,0 +1,189 @@
+#include "render.h"
+#include "mesh.h"
+#include "game.h"
+#include "entity.h"
+#include "character_renderer.h"
+
+void load_shaders(RenderShaders& shaders, int width, int height) {
+    shaders.flat   = LoadShader(0, "assets/flat.fs");
+    shaders.bloom  = LoadShader(0, "assets/bloom.fs");
+    shaders.pastel = LoadShader(0, "assets/pastel.fs");
+    shaders.fxaa   = LoadShader(0, "assets/fxaa.fs");
+    shaders.lightDirLoc = GetShaderLocation(shaders.flat, "lightDir");
+    shaders.lightColorLoc = GetShaderLocation(shaders.flat, "lightColor");
+    shaders.fxaaResLoc = GetShaderLocation(shaders.fxaa, "resolution");
+
+    Vector3 lightDir = { -0.35f, -1.0f, -0.45f };
+    Vector3 lightColor = { 1.0f, 1.0f, 1.0f };
+    SetShaderValue(shaders.flat, shaders.lightDirLoc, &lightDir, SHADER_UNIFORM_VEC3);
+    SetShaderValue(shaders.flat, shaders.lightColorLoc, &lightColor, SHADER_UNIFORM_VEC3);
+
+    update_shader_resolution(shaders, width, height);
+}
+
+void update_shader_resolution(RenderShaders& shaders, int width, int height) {
+    Vector2 fxaaRes = { (float)width, (float)height };
+    if (shaders.fxaa.id != 0 && shaders.fxaaResLoc >= 0) {
+        SetShaderValue(shaders.fxaa, shaders.fxaaResLoc, &fxaaRes, SHADER_UNIFORM_VEC2);
+    }
+}
+
+void load_models(RenderModels& models, const RenderShaders& shaders) {
+    Mesh spikyMesh   = MeshGenerator::createSpikyBlobMesh(0.5f, 12, 12, 0.35f);
+    Mesh twistedMesh = MeshGenerator::createTwistedColumnMesh(0.35f, 1.2f, 14, 2);
+    Mesh planetMesh  = MeshGenerator::createLowPolySphereMesh(80.0f, 18, 18, 4.0f);
+    Mesh cloudsMesh  = MeshGenerator::createLowPolySphereMesh(82.0f, 18, 18, 2.0f);
+
+    models.cube    = LoadModelFromMesh(MeshGenerator::createCubeMesh(0.8f));
+    models.spiky   = LoadModelFromMesh(spikyMesh);
+    models.twisted = LoadModelFromMesh(twistedMesh);
+    models.planet  = LoadModelFromMesh(planetMesh);
+    models.clouds  = LoadModelFromMesh(cloudsMesh);
+}
+
+void unload_models(RenderModels& models) {
+    if (models.cube.meshCount > 0)    UnloadModel(models.cube);
+    if (models.spiky.meshCount > 0)   UnloadModel(models.spiky);
+    if (models.twisted.meshCount > 0) UnloadModel(models.twisted);
+    if (models.planet.meshCount > 0)  UnloadModel(models.planet);
+    if (models.clouds.meshCount > 0)  UnloadModel(models.clouds);
+    models = {};
+}
+
+void render_scene(const AppContext& ctx, RendererInterface* renderer) {
+        // Draw an 8x8 chessboard at the origin (0,0,0) on the XZ plane
+        const int boardSize = 8;
+        const float tileSize = 1.0f;
+        Vector3 boardOrigin = {0.0f, 0.0f, 0.0f};
+        Color color1 = LIGHTGRAY; // light gray
+        Color color2 = DARKGRAY;  // dark gray
+        for (int x = 0; x < boardSize; ++x) {
+            for (int z = 0; z < boardSize; ++z) {
+                Color tileColor = ((x + z) % 2 == 0) ? color1 : color2;
+                Vector3 pos = {boardOrigin.x + (x - boardSize/2) * tileSize + tileSize/2,
+                               boardOrigin.y,
+                               boardOrigin.z + (z - boardSize/2) * tileSize + tileSize/2};
+                DrawCube(pos, tileSize, 0.05f, tileSize, tileColor);
+            }
+        }
+    const bool shouldRenderScene = ctx.ui.showEntities || ctx.ui.showEnvironment;
+    if (!shouldRenderScene) return;
+    renderer->Begin3D(ctx.camera);
+
+    BeginShaderMode(ctx.shaders.flat);
+
+    // Planet and clouds (defensive check on rotation if game not yet wired)
+    // Move the planet far away from the origin
+    Vector3 planetPos = {10000.0f, -9000.0f, 10000.0f};
+    float planetRot = ctx.game ? ctx.game->planetRot : 0.0f;
+    float cloudsRot = ctx.game ? ctx.game->cloudsRot : 0.0f;
+    if (ctx.ui.showEnvironment) {
+        renderer->DrawModelEx(ctx.models.planet, planetPos, {0,1,0}, planetRot, {1.0f,-1.0f,1.0f}, BLUE);
+
+        BeginBlendMode(BLEND_ALPHA);
+        renderer->DrawModelEx(ctx.models.clouds, planetPos, {0,1,0}, cloudsRot, {1.0f,-0.5f,1.0f}, Fade(WHITE, 0.3f));
+        EndBlendMode();
+    }
+
+    // Entities (requires game pointer)
+    if (ctx.game && ctx.ui.showEntities) {
+        const float entityBaseY = 0.45f;
+        const float entityOffset = 6.0f;
+        for (const Entity& entity : ctx.game->entities) {
+            Vector3 pos = { entity.position.x - 6.0f + entityOffset, entityBaseY, entity.position.y - 6.0f + entityOffset };
+            if (entity.type == PLAYER) { // The fox adventurer
+                DrawFoxAdventurer(renderer, pos);
+                // The original DrawFoxAdventurer also drew cube wires. Let's add that back here.
+                renderer->DrawCubeWires({pos.x, pos.y + 0.6f * 0.8f, pos.z}, 0.7f * 0.8f, 0.9f * 0.8f, 0.4f * 0.8f, Fade(BLACK, 0.4f));
+                renderer->DrawCubeWires({pos.x, pos.y + 1.3f * 0.8f, pos.z}, 0.9f * 0.8f, 0.8f * 0.8f, 0.7f * 0.8f, Fade(BLACK, 0.5f));
+            } else if (entity.type == ENEMY) {
+                renderer->DrawModel(ctx.models.spiky, pos, 1.0f, PURPLE);
+            } else {
+                renderer->DrawModel(ctx.models.twisted, pos, 1.0f, GOLD);
+            }
+        }
+    }
+
+    EndShaderMode();
+    renderer->End3D();
+}
+
+void Render_HandleResize(AppContext& ctx, int width, int height) {
+    int rtWidth = (int)(width * ctx.targets.scale);
+    int rtHeight = (int)(height * ctx.targets.scale);
+
+    if (ctx.targets.scene.id != 0) UnloadRenderTexture(ctx.targets.scene);
+    if (ctx.targets.post.id != 0) UnloadRenderTexture(ctx.targets.post);
+
+    ctx.targets.scene = LoadRenderTexture(rtWidth, rtHeight);
+    ctx.targets.post  = LoadRenderTexture(rtWidth, rtHeight);
+
+    update_shader_resolution(ctx.shaders, rtWidth, rtHeight);
+
+    ctx.targets.width = width;
+    ctx.targets.height = height;
+}
+
+void Render_Init(AppContext& ctx) {
+    load_shaders(ctx.shaders, ctx.window->GetWidth(), ctx.window->GetHeight());
+    load_models(ctx.models, ctx.shaders);
+
+    ctx.targets.width = ctx.window->GetWidth();
+    ctx.targets.height = ctx.window->GetHeight();
+    ctx.targets.scale = 1.0f;
+    Render_HandleResize(ctx, ctx.targets.width, ctx.targets.height);
+}
+
+void Render_Cleanup(AppContext& ctx) {
+    UnloadShader(ctx.shaders.flat);
+    UnloadShader(ctx.shaders.bloom);
+    UnloadShader(ctx.shaders.pastel);
+    UnloadShader(ctx.shaders.fxaa);
+    unload_models(ctx.models);
+    UnloadRenderTexture(ctx.targets.scene);
+    UnloadRenderTexture(ctx.targets.post);
+}
+
+void Render_DrawFrame(AppContext& ctx) {
+    // --- Render 3D scene to sceneTarget ---
+    BeginTextureMode(ctx.targets.scene);
+    ClearBackground(RAYWHITE);
+    render_scene(ctx, ctx.renderer.get());
+    EndTextureMode();
+
+    // --- Post-processing passes ---
+    // Bloom pass into postTarget
+    Rectangle sceneSrc = {0, 0, (float)ctx.targets.scene.texture.width, -(float)ctx.targets.scene.texture.height};
+    Vector2 screenPos = {0, 0};
+    BeginTextureMode(ctx.targets.post);
+    ClearBackground(BLACK);
+    BeginShaderMode(ctx.shaders.bloom);
+        DrawTextureRec(ctx.targets.scene.texture, sceneSrc, screenPos, WHITE);
+    EndShaderMode();
+    EndTextureMode();
+
+    // Pastel grade into sceneTarget (reusing it as a temp buffer)
+    Rectangle postSrc = {0, 0, (float)ctx.targets.post.texture.width, -(float)ctx.targets.post.texture.height};
+    BeginTextureMode(ctx.targets.scene);
+    ClearBackground(BLACK);
+    BeginShaderMode(ctx.shaders.pastel);
+        DrawTextureRec(ctx.targets.post.texture, postSrc, screenPos, WHITE);
+    EndShaderMode();
+    EndTextureMode();
+
+    // --- Final draw to screen with FXAA ---
+    int winW = ctx.window->GetWidth();
+    int winH = ctx.window->GetHeight();
+    Rectangle dest = {0, 0, (float)winW, (float)winH};
+
+    ctx.window->BeginFrame();
+    ClearBackground(BLACK);
+    if (ctx.ui.fxaa) {
+        BeginShaderMode(ctx.shaders.fxaa);
+            DrawTexturePro(ctx.targets.scene.texture, sceneSrc, dest, {0,0}, 0.0f, WHITE);
+        EndShaderMode();
+    } else {
+        DrawTexturePro(ctx.targets.scene.texture, sceneSrc, dest, {0,0}, 0.0f, WHITE);
+    }
+
+}

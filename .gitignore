@@ -1,0 +1,40 @@
+# Compiled object files
+*.o
+*.obj
+*.out
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+
+# Executables
+*.exe
+*.app
+
+# IDE files
+.vscode/
+.vs/
+*.vcxproj.user
+*.sln.DotSettings
+*.swp
+*.swo
+*~
+
+# CMake
+CMakeUserPresets.json
+cmake_build_debug/
+cmake_build_release/
+
+# Build and dependencies
+build/
+third_party/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.lnk
+
+# Temporary files
+*.tmp
+*.log
