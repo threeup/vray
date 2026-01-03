@@ -1,6 +1,7 @@
 param(
 	[string]$Config = "Release",
-	[string]$BuildDir = "build"
+	[string]$BuildDir = "build",
+	[string]$Filter = "smoke"  # ctest -R filter
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,26 +14,21 @@ if (-not (Test-Path $BuildPath)) {
 }
 
 Write-Host "Configuring CMake at $BuildPath" -ForegroundColor Cyan
-cmake -S $RepoRoot -B $BuildPath
+cmake -S $RepoRoot -B $BuildPath -A x64
 
-Write-Host "Building mesh_tests (config=$Config)" -ForegroundColor Cyan
-cmake --build $BuildPath --target mesh_tests --config $Config
+Write-Host "Building all tests (config=$Config)" -ForegroundColor Cyan
+cmake --build $BuildPath --config $Config --target smoke_tests mesh_tests
 
-$exeCandidates = @(
-    (Join-Path $BuildPath "mesh_tests.exe"),
-    (Join-Path (Join-Path $BuildPath $Config) "mesh_tests.exe")
-)
-
-$exe = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $exe) {
-	throw "mesh_tests.exe not found. Checked: $($exeCandidates -join ', ')"
+# Prefer ctest to find the right binary per config
+Push-Location $BuildPath
+try {
+	Write-Host "Running ctest -R $Filter -C $Config" -ForegroundColor Cyan
+	ctest -R $Filter -C $Config --output-on-failure
+	if ($LASTEXITCODE -ne 0) {
+		throw "ctest reported failure ($LASTEXITCODE)"
+	}
+} finally {
+	Pop-Location
 }
 
-Write-Host "Running $exe" -ForegroundColor Cyan
-& $exe
-
-if ($LASTEXITCODE -ne 0) {
-	throw "mesh_tests failed with exit code $LASTEXITCODE"
-}
-
-Write-Host "mesh_tests passed" -ForegroundColor Green
+Write-Host "Tests passed" -ForegroundColor Green
