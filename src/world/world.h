@@ -33,6 +33,7 @@ struct WorldEntity {
     Color color;          // Tint applied when drawing
     int id;               // Entity ID for lookup
     float moveProgress;   // 0.0 = at current waypoint, 1.0 = at target (for lerp animation)
+    bool isActor = false; // True for mechs (heroes/enemies), false for props
     bool isEnemy = false; // Patrol only enemies
     std::array<Vector3, 4> patrolPoints{}; // Clockwise square loop
     int patrolIndex = 0;  // Index into patrolPoints for the next target

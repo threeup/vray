@@ -11,11 +11,27 @@ struct UiActions;
 struct Game {
     Grid grid;
     std::vector<Entity> entities;
-    Sequence currentSeq;
-    std::vector<Card> hand;
+    Hand hand;
+    TurnPlan currentPlan;
+    TurnPlan lastAiPlan;
+    std::string lastAiPlanText;
+    int lastSelectedMechId = -1;
+    bool mirrorNext = false;
+    int pendingCardId = -1;
+    bool pendingMirror = false;
+    int turnNumber = 0;
     float planetRot = 0.0f;
     float cloudsRot = 0.0f;
 };
+
+// Reset per-turn state (hand usage, sequence).
+void begin_turn(Game& game);
+
+// Increment turn counter after a full round completes.
+void advance_turn(Game& game);
+
+// Execute a full round: player plan then AI response, advancing the turn.
+void resolve_round(Game& game, const TurnPlan& playerPlan, uint32_t seed = 0, float mirrorChance = 0.5f);
 
 // Seed a basic scene: player, enemy, object, and sample hand.
 void init_game(Game& game);
@@ -26,5 +42,8 @@ void update_game(Game& game, float dt);
 // Handle user input that affects game state.
 void handle_input(Game& game, const Platform& platform);
 
-// Handle actions triggered from the UI.
-void handle_ui_actions(Game& game, const UiActions& actions);
+// Handle actions triggered from the UI. Optional flag to suppress auto-resolve.
+void handle_ui_actions(Game& game, const UiActions& actions, bool allowResolve = true);
+
+// Execute a random AI turn for provided seed (uses enemy mech ids if present).
+void execute_ai_random_turn(Game& game, uint32_t seed, float mirrorChance = 0.5f);

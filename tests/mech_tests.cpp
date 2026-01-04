@@ -238,19 +238,6 @@ TEST(MechGeneration, FootPositioning) {
     EXPECT_EQ(footLeft_x, -footRight_x); // Symmetric
 }
 
-// Test shader uniform updates for light
-TEST(Rendering, LightUniformUpdate) {
-    // Verify that light position can be encoded as a float array
-    // for passing to shader
-    
-    Vector3 lightPos = {3.5f, 2.1f, -1.2f};
-    float lightArray[3] = {lightPos.x, lightPos.y, lightPos.z};
-    
-    EXPECT_FLOAT_EQ(lightArray[0], 3.5f);
-    EXPECT_FLOAT_EQ(lightArray[1], 2.1f);
-    EXPECT_FLOAT_EQ(lightArray[2], -1.2f);
-}
-
 // Test that all mech parts are included in assembly
 TEST(MechGeneration, PartCount) {
     // AssembleMech should create exactly 14 parts:

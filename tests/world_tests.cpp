@@ -2,6 +2,8 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "world/world.h"
+#include "app.h"
+#include "platform/platform.h"
 #include <array>
 
 // Mock AppContext for testing (minimal)
@@ -241,6 +243,31 @@ TEST(WorldSystem, WorldEntityArray) {
     
     EXPECT_EQ(entities.size(), 3);
     EXPECT_EQ(entities[0], 1);
+}
+
+// Test actors are flagged correctly (mechs true, props false) after World_Init
+TEST(WorldSystem, ActorsFlaggedAndPropsExcluded) {
+    Platform platform = Platform::CreateRaylibPlatform();
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    platform.window->Init(200, 150, "actor_flag_test");
+
+    AppContext ctx{platform.window, platform.input, platform.renderer};
+    ctx.shaders.flat = LoadShader("assets/xflat.vs", "assets/xflat.fs");
+
+    World world{};
+    World_Init(world, ctx);
+
+    int actorCount = 0;
+    int propCount = 0;
+    for (const auto& e : world.entities) {
+        if (e.isActor) actorCount++; else propCount++;
+    }
+
+    EXPECT_EQ(actorCount, 6);      // 3 heroes + 3 enemies
+    EXPECT_GT(propCount, 0);       // trees/mountains/skyscrapers
+
+    if (ctx.shaders.flat.id != 0) UnloadShader(ctx.shaders.flat);
+    platform.window->Close();
 }
 
 // Test tile type coverage

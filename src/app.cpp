@@ -19,6 +19,7 @@ void init_app(AppContext& ctx, int width, int height) {
     ctx.ui.fxaa = true;
     ctx.ui.showEntities = true;
     ctx.ui.showEnvironment = true;
+    ctx.ui.renderControlsCollapsed = true;
 }
 
 void rebuild_render_targets(AppContext& ctx, float scale, int width, int height) {

@@ -6,6 +6,30 @@
 #include "platform/renderer_interface.h"
 #include "mesh.h"
 #include "world/world.h"
+#include "app.h"
+
+// Detect faction from mech color
+static int GetFactionFromColor(Color c) {
+    float r = c.r / 255.0f;
+    float g = c.g / 255.0f;
+    float b = c.b / 255.0f;
+    
+    // Find the dominant color channel
+    float maxVal = fmaxf(fmaxf(r, g), b);
+    
+    // Only classify if the dominant channel is strong enough
+    if (maxVal < 0.4f) return (int)FactionType::Neutral;
+    
+    // Red faction: red is dominant
+    if (r == maxVal) return (int)FactionType::RedFaction;
+    // Blue faction: blue is dominant
+    if (b == maxVal) return (int)FactionType::BlueFaction;
+    // Green faction: green is dominant
+    if (g == maxVal) return (int)FactionType::GreenFaction;
+    
+    // Default to neutral
+    return (int)FactionType::Neutral;
+}
 
 // Initialize render targets and shaders using window size from AppContext
 void Render_Init(AppContext& ctx) {
@@ -30,6 +54,9 @@ void Render_Init(AppContext& ctx) {
     ctx.shaders.flat = LoadShader("assets/xflat.vs", "assets/xflat.fs");
     ctx.shaders.flatLightPosLoc = GetShaderLocation(ctx.shaders.flat, "lightPos");
     ctx.shaders.flatViewPosLoc = GetShaderLocation(ctx.shaders.flat, "viewPos");
+    ctx.shaders.flatPaletteEnabledLoc = GetShaderLocation(ctx.shaders.flat, "paletteEnabled");
+    ctx.shaders.flatPaletteIndexLoc = GetShaderLocation(ctx.shaders.flat, "paletteIndex");
+    ctx.shaders.flatPaletteStrengthLoc = GetShaderLocation(ctx.shaders.flat, "paletteStrength");
 
     // Post-Processing
     ctx.shaders.bloom = LoadShader(0, "assets/bloom.fs");
@@ -144,15 +171,32 @@ static void Render_DrawScene(AppContext& app, const World& world) {
         ClearBackground(RAYWHITE);
         BeginShaderMode(shaders.flat);
         BeginMode3D(app.camera);
+            // Default palette off for non-actors
+            int paletteEnabled = 0;
+            SetShaderValue(shaders.flat, shaders.flatPaletteEnabledLoc, &paletteEnabled, SHADER_UNIFORM_INT);
+            float paletteStrength = app.ui.paletteEnabled ? app.ui.paletteStrength : 0.0f;
+            SetShaderValue(shaders.flat, shaders.flatPaletteStrengthLoc, &paletteStrength, SHADER_UNIFORM_FLOAT);
             // 1. Draw entities (Models use the flat shader assigned in World_Init)
             if (app.ui.showEntities) {
                 for (const auto& entity : world.entities) {
+                    if (app.ui.paletteEnabled && entity.isActor) {
+                        paletteEnabled = 1;
+                        SetShaderValue(shaders.flat, shaders.flatPaletteEnabledLoc, &paletteEnabled, SHADER_UNIFORM_INT);
+                        int paletteIdx = GetFactionFromColor(entity.color);
+                        SetShaderValue(shaders.flat, shaders.flatPaletteIndexLoc, &paletteIdx, SHADER_UNIFORM_INT);
+                    } else {
+                        paletteEnabled = 0;
+                        SetShaderValue(shaders.flat, shaders.flatPaletteEnabledLoc, &paletteEnabled, SHADER_UNIFORM_INT);
+                    }
                     DrawModel(entity.model, entity.position, entity.scale.x, entity.color);
                 }
             }
 
             // 2. Draw the environment
             if (app.ui.showEnvironment) {
+                // Ensure palette is off for ground/props
+                paletteEnabled = 0;
+                SetShaderValue(shaders.flat, shaders.flatPaletteEnabledLoc, &paletteEnabled, SHADER_UNIFORM_INT);
                 World_DrawGround(world, app);
             }
 
@@ -192,14 +236,6 @@ void Render_DrawFrame(AppContext& ctx, World& world) {
         ApplyCopy(*src, dst, ctx.targets.width, ctx.targets.height);
         src = dst;
         dst = &ctx.targets.scene;
-    }
-
-    // Pass B: Optional palettized shading (ping-pong)
-    if (ctx.ui.paletteEnabled) {
-        SetShaderValue(ctx.shaders.palette, GetShaderLocation(ctx.shaders.palette, "strength"), &ctx.ui.paletteStrength, SHADER_UNIFORM_FLOAT);
-        ApplyEffect(ctx.shaders.palette, *src, dst, ctx.targets.width, ctx.targets.height);
-        src = dst;
-        dst = (dst == &ctx.targets.scene) ? &ctx.targets.post : &ctx.targets.scene;
     }
 
     // --- STEP 4: FINAL OUTPUT (Post -> Screen) ---

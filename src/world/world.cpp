@@ -7,7 +7,7 @@
 #include <algorithm>
 
 // Private helper to wrap mesh processing and model creation
-static void AddEntity(World& world, Mesh mesh, Vector3 pos, Color tint, Shader shader) {
+static void AddEntity(World& world, Mesh mesh, Vector3 pos, Color tint, Shader shader, bool isActor) {
     // Upload geometry once per mesh instance
     if (mesh.vaoId == 0) {
         MeshUtils::unshareMeshVertices(&mesh);
@@ -24,6 +24,7 @@ static void AddEntity(World& world, Mesh mesh, Vector3 pos, Color tint, Shader s
     ent.color = tint;
     ent.id = static_cast<int>(world.entities.size());  // Simple ID assignment
     ent.moveProgress = 0.0f;
+    ent.isActor = isActor;
     ent.isEnemy = false;
 
     world.entities.push_back(ent);
@@ -116,15 +117,15 @@ static void PlacePropsFromTiles(World& world, const AppContext& appCtx) {
             switch (t) {
             case TileType::Forest:
                 pos.y += 0.30f; // lift trees above slab
-                AddEntity(world, treeMesh, pos, Color{30, 160, 80, 255}, appCtx.shaders.flat);
+                AddEntity(world, treeMesh, pos, Color{30, 160, 80, 255}, appCtx.shaders.flat, false);
                 break;
             case TileType::Mountain:
                 pos.y += 0.50f; // taller mountain placement (150% tree height)
-                AddEntity(world, mountainMesh, pos, Color{110, 96, 80, 255}, appCtx.shaders.flat);
+                AddEntity(world, mountainMesh, pos, Color{110, 96, 80, 255}, appCtx.shaders.flat, false);
                 break;
             case TileType::Skyscraper:
                 pos.y += 0.80f; // half the skyscraper height
-                AddEntity(world, skyscraperMesh, pos, Color{140, 140, 150, 255}, appCtx.shaders.flat);
+                AddEntity(world, skyscraperMesh, pos, Color{140, 140, 150, 255}, appCtx.shaders.flat, false);
                 break;
             default:
                 break;
@@ -143,7 +144,7 @@ static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
 
     auto tileToEntityPos = [&](int tx, int ty) -> Vector3 {
         Vector3 p = tileToWorldPos(tx, ty);
-        p.y = TileHeight(world.tiles[idx(tx, ty)]) + 0.10f; // lift entity above slab
+        p.y = TileHeight(world.tiles[idx(tx, ty)]) + 0.60f; // lift entity above slab
         return p;
     };
     
@@ -157,33 +158,19 @@ static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
             const Occupant occ = world.occupants[idx(x, y)];
             if (occ == Occupant::None) continue;
 
-            float baseY = TileHeight(world.tiles[idx(x, y)]) + 0.05f; // top of tile slab
-            Vector3 pos = { (x - World::kTilesWide * 0.5f + 0.5f) * World::kTileSize,
-                            baseY + 0.05f,
-                            (y - World::kTilesHigh * 0.5f + 0.5f) * World::kTileSize };
+            Vector3 pos = tileToEntityPos(x, y);
 
             if (occ == Occupant::Hero) {
-                AddEntity(world, mechMesh, pos, Color{80, 200, 120, 255}, appCtx.shaders.flat);
+                AddEntity(world, mechMesh, pos, Color{80, 200, 120, 255}, appCtx.shaders.flat, true);
             } else if (occ == Occupant::Enemy) {
-                AddEntity(world, mechMesh, pos, Color{200, 90, 90, 255}, appCtx.shaders.flat);
+                AddEntity(world, mechMesh, pos, Color{200, 90, 90, 255}, appCtx.shaders.flat, true);
 
                 WorldEntity& enemy = world.entities.back();
                 enemy.isEnemy = true;
                 enemy.startPos = pos;
-
-                // Clockwise square patrol: spawn -> right -> down -> left -> back up
-                const int x1 = (x + 1) % World::kTilesWide;
-                const int y1 = (y + 1) % World::kTilesHigh;
-
-                enemy.patrolPoints = {
-                    pos,
-                    tileToEntityPos(x1, y),
-                    tileToEntityPos(x1, y1),
-                    tileToEntityPos(x, y1)
-                };
-
-                enemy.patrolIndex = 1; // next waypoint is to the right
-                enemy.targetPos = enemy.patrolPoints[enemy.patrolIndex];
+                enemy.targetPos = pos; // No patrol; stays put unless commanded by turn system
+                enemy.patrolPoints = {pos, pos, pos, pos};
+                enemy.patrolIndex = 0;
             }
         }
     }
@@ -193,13 +180,7 @@ static void AdvanceTurn(World& world) {
     for (auto& entity : world.entities) {
         entity.startPos = entity.targetPos; // assume it reached its target at turn boundary
         entity.moveProgress = 0.0f;
-
-        if (entity.isEnemy) {
-            entity.patrolIndex = (entity.patrolIndex + 1) % static_cast<int>(entity.patrolPoints.size());
-            entity.targetPos = entity.patrolPoints[entity.patrolIndex];
-        } else {
-            entity.targetPos = entity.startPos;
-        }
+        entity.targetPos = entity.startPos; // No automatic patrol progression
     }
 
     world.currentTurn++;
@@ -259,20 +240,11 @@ void World_Update(World& world, float elapsedTime) {
     world.lights[world.activeLight].position = lightPos;
     
     // ==================== TURN SYSTEM ====================
-    world.turnElapsedTime += GetFrameTime();
-
-    // Advance turn when duration exceeded (catch up if frames run long)
-    while (world.turnElapsedTime >= World::kTurnDuration) {
-        world.turnElapsedTime -= World::kTurnDuration;
-        AdvanceTurn(world);
-    }
-    
-    // Update entity movement based on turn progress
-    float turnProgress = world.turnElapsedTime / World::kTurnDuration;  // [0, 1)
-    
+    // Turn progression is driven externally; keep entities fixed unless the turn system updates targetPos.
+    world.turnElapsedTime = 0.0f;
     for (auto& entity : world.entities) {
-        entity.moveProgress = turnProgress;
-        entity.position = Vector3Lerp(entity.startPos, entity.targetPos, turnProgress);
+        entity.moveProgress = 0.0f;
+        entity.position = entity.targetPos;
     }
 }
 void World_DrawGround(const World& world, const AppContext& appCtx) {

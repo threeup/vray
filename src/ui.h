@@ -9,6 +9,14 @@
 struct UiActions {
     bool playSequence = false;
     bool clearSequence = false;
+    bool mirrorNext = false;
+    int selectedMechId = -1;
+    int selectedCardId = -1;
+    bool undoLast = false;
+    int removeAssignmentMechId = -1;
+    int selectCardId = -1;       // choose a card for assignment
+    int assignCardToMech = -1;   // assign the selected card to this mech
+    bool confirmPlan = false;    // explicit confirm/advance
 };
 
 // Draw card/sequence panel; returns user intents (play/clear).

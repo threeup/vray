@@ -4,6 +4,12 @@
 #include <vector>
 #include <cstring>
 #include "meshProcessUtils.h"
+
+static float SmoothStep(float edge0, float edge1, float x) {
+    x = (x - edge0) / (edge1 - edge0);
+    x = fmaxf(0.0f, fminf(1.0f, x));
+    return x * x * (3.0f - 2.0f * x);
+}
 struct MechPart {
     Mesh mesh;
     Matrix transform;
@@ -164,7 +170,8 @@ Mesh CreateMechHead(float width, float height) {
         
         // Flatten/Push the "face" forward (assuming Z+ is forward)
         // cosf(angle) > 0.5 picks the front-most slices of the hexagon
-        float zOffset = (cosf(angle) > 0.5f) ? (width * 0.3f) : 0.0f; 
+        float frontBias = SmoothStep(0.0f, 0.7f, cosf(angle)); // soften transition on low-poly hex
+        float zOffset = width * 0.25f * frontBias; 
 
         return Vector3{ 
             cosf(angle) * radius, 
@@ -231,12 +238,51 @@ Mesh CreateMechHead(float width, float height) {
     memcpy(mesh.vertices, vertices.data(), vertices.size() * sizeof(float));
     memcpy(mesh.indices, indices.data(), indices.size() * sizeof(unsigned short));
 
-    // Upload and calculate normals for lighting
-    MeshUtils::computeMeshNormals(&mesh);
-    UploadMesh(&mesh, false);
-
     return mesh;
 }
+
+static Mesh CreateArmoredLegPart(float bottomRad, float topRad, float height) {
+    std::vector<float> vertices;
+    std::vector<unsigned short> indices;
+    int sides = 6;
+    float h2 = height / 2.0f;
+
+    // Helper to add a flat quad for a side
+    auto addFlatSide = [&](int i) {
+        int next = (i + 1) % sides;
+        float ang1 = (float)i / sides * 2.0f * PI;
+        float ang2 = (float)next / sides * 2.0f * PI;
+
+        unsigned short baseIdx = (unsigned short)(vertices.size() / 3);
+
+        // Define 4 unique vertices for this specific panel
+        // Bottom Right
+        vertices.push_back(cosf(ang1) * bottomRad); vertices.push_back(-h2); vertices.push_back(sinf(ang1) * bottomRad);
+        // Bottom Left
+        vertices.push_back(cosf(ang2) * bottomRad); vertices.push_back(-h2); vertices.push_back(sinf(ang2) * bottomRad);
+        // Top Left
+        vertices.push_back(cosf(ang2) * topRad);    vertices.push_back(h2);  vertices.push_back(sinf(ang2) * topRad);
+        // Top Right
+        vertices.push_back(cosf(ang1) * topRad);    vertices.push_back(h2);  vertices.push_back(sinf(ang1) * topRad);
+
+        indices.push_back(baseIdx + 0); indices.push_back(baseIdx + 2); indices.push_back(baseIdx + 1);
+        indices.push_back(baseIdx + 0); indices.push_back(baseIdx + 3); indices.push_back(baseIdx + 2);
+    };
+
+    for (int i = 0; i < sides; i++) addFlatSide(i);
+
+    // Finalize Mesh
+    Mesh mesh = { 0 };
+    mesh.vertexCount = (int)vertices.size() / 3;
+    mesh.triangleCount = (int)indices.size() / 3;
+    mesh.vertices = (float*)RL_MALLOC(vertices.size() * sizeof(float));
+    mesh.indices = (unsigned short*)RL_MALLOC(indices.size() * sizeof(unsigned short));
+    std::memcpy(mesh.vertices, vertices.data(), vertices.size() * sizeof(float));
+    std::memcpy(mesh.indices, indices.data(), indices.size() * sizeof(unsigned short));
+    
+    return mesh;
+}
+
 Mesh CreateRocketPod(float width, float height, float depth) {
     std::vector<float> vertices;
     std::vector<unsigned short> indices;
@@ -308,8 +354,6 @@ Mesh CreateRocketPod(float width, float height, float depth) {
         }
     }
 
-    MeshUtils::computeMeshNormals(&mesh);
-    UploadMesh(&mesh, false);
     return mesh;
 }
 Mesh CreateMechFoot(float width, float length) {
@@ -374,53 +418,154 @@ Mesh CreateMechFoot(float width, float length) {
     }
 
     // Generate normals so the foot looks 3D with lighting
-    MeshUtils::computeMeshNormals(&mesh);
-    UploadMesh(&mesh, false);
-
     return mesh;
 }
+
+static Mesh CreatePlasmaCannon(float radius, float length) {
+    std::vector<float> vertices;
+    std::vector<unsigned short> indices;
+    int sides = 8;
+    
+    // Helper to add a flat-shaded cylinder segment
+    auto addSegment = [&](float rBottom, float rTop, float h, float yOffset) {
+        float h2 = h / 2.0f;
+        for (int i = 0; i < sides; i++) {
+            int next = (i + 1) % sides;
+            float ang1 = (float)i / sides * 2.0f * PI;
+            float ang2 = (float)next / sides * 2.0f * PI;
+
+            unsigned short baseIdx = (unsigned short)(vertices.size() / 3);
+
+            // 4 vertices per side panel for flat shading
+            Vector3 v1 = {cosf(ang1) * rBottom, yOffset - h2, sinf(ang1) * rBottom};
+            Vector3 v2 = {cosf(ang2) * rBottom, yOffset - h2, sinf(ang2) * rBottom};
+            Vector3 v3 = {cosf(ang2) * rTop,    yOffset + h2, sinf(ang2) * rTop};
+            Vector3 v4 = {cosf(ang1) * rTop,    yOffset + h2, sinf(ang1) * rTop};
+
+            vertices.insert(vertices.end(), {v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, v4.x, v4.y, v4.z});
+
+            indices.push_back(baseIdx + 0); indices.push_back(baseIdx + 2); indices.push_back(baseIdx + 1);
+            indices.push_back(baseIdx + 0); indices.push_back(baseIdx + 3); indices.push_back(baseIdx + 2);
+        }
+    };
+
+    // Part A: Cooling Shroud (The thick heavy base)
+    float shroudLen = length * 0.35f;
+    float shroudRad = radius * 1.8f;
+    addSegment(shroudRad, shroudRad * 0.9f, shroudLen, -length * 0.3f);
+
+    // Part B: Main Barrel
+    float barrelLen = length * 0.6f;
+    addSegment(radius, radius, barrelLen, length * 0.15f);
+
+    // Part C: Muzzle Brake (The tip)
+    float muzzleLen = length * 0.1f;
+    addSegment(radius * 1.2f, radius * 1.1f, muzzleLen, length * 0.45f);
+
+    // Finalize Mesh
+    Mesh mesh = { 0 };
+    mesh.vertexCount = (int)vertices.size() / 3;
+    mesh.triangleCount = (int)indices.size() / 3;
+    mesh.vertices = (float*)RL_MALLOC(vertices.size() * sizeof(float));
+    mesh.indices = (unsigned short*)RL_MALLOC(indices.size() * sizeof(unsigned short));
+    std::memcpy(mesh.vertices, vertices.data(), vertices.size() * sizeof(float));
+    std::memcpy(mesh.indices, indices.data(), indices.size() * sizeof(unsigned short));
+    
+    return mesh;
+}
+
+static Mesh CreateArmorPlate(float width, float height, float thickness) {
+    // We can use a slightly scaled cube for the armor plate
+    Mesh mesh = GenMeshCube(width, height, thickness);
+    return mesh; 
+}
+
 ProceduralMech AssembleMech() {
     ProceduralMech mech;
+    const float scale = 0.4f; 
     
-    // Lankier proportions with thinner limbs, then scale to 40% overall size
-    const float scale = 0.4f;
+    // --- LEGS (BattleTech Style) ---
+    float stanceWidth = 0.6f * scale;
+
+    for (int side = -1; side <= 1; side += 2) { // -1 for Left, 1 for Right
+        float x = side * stanceWidth;
+
+        // 1. Massive Foot (Using your custom Foot mesh)
+        mech.AddPart(CreateMechFoot(0.4f * scale, 0.9f * scale), MatrixTranslate(x, 0.1f * scale, 0.1f * scale));
+
+        // 2. Ankle Joint
+        mech.AddPart(CreateSimpleSphere(0.15f * scale, 8, 8), MatrixTranslate(x, 0.25f * scale, 0));
+
+        // 3. Lower Leg (Tapered Hex)
+        mech.AddPart(CreateArmoredLegPart(0.15f * scale, 0.25f * scale, 1.2f * scale), 
+                    MatrixTranslate(x, 0.85f * scale, 0));
+
+        // 4. Knee Joint (Bulge)
+        mech.AddPart(CreateSimpleSphere(0.28f * scale, 8, 8), MatrixTranslate(x, 1.45f * scale, 0.1f * scale));
+
+
+        // 5. Upper Leg
+        Matrix rotation = MatrixRotateX(-15 * DEG2RAD); // Predatory lean
+        Matrix translation = MatrixTranslate(x, 2.2f * scale, 0);
+        Matrix thighTransform = MatrixMultiply(rotation, translation);
+
+        mech.AddPart(CreateArmoredLegPart(0.25f * scale, 0.35f * scale, 1.4f * scale), thighTransform);
+
+        // 6. Hip Actuator (CORRECTED MATRIX ORDER)
+        // Rotate the cylinder 90 degrees to make it a horizontal axle
+        Matrix hipJointMatrix = MatrixMultiply(MatrixRotateZ(90 * DEG2RAD), MatrixTranslate(x * 0.7f, 2.9f * scale, 0));
+        mech.AddPart(CreateSimpleCylinder(0.2f * scale, 0.4f * scale, 6), hipJointMatrix);
+    }
+
+    // --- UPPER BODY ---
+    // Pelvis: Widened to match the new stanceWidth
+    mech.AddPart(GenMeshCube(1.2f * scale, 0.4f * scale, 0.8f * scale), MatrixTranslate(0, 3.0f * scale, 0));
     
-    // Bottom-up stack with proper vertical alignment
-    // Feet: smaller, lankier proportions
-    mech.AddPart(CreateMechFoot(0.35f * scale, 0.7f * scale), MatrixTranslate(-0.4f * scale, 0.1f * scale, 0.08f * scale));
-    mech.AddPart(CreateMechFoot(0.35f * scale, 0.7f * scale), MatrixTranslate(0.4f * scale, 0.1f * scale, 0.08f * scale));
+    // --- ARMS & SHOULDERS ---
+    for (int side = -1; side <= 1; side += 2) {
+        float xPos = side * 0.85f * scale; 
+        float yPos = 4.8f * scale;
+
+        // 1. Shoulder Joint (The Sphere)
+        mech.AddPart(CreateSimpleSphere(0.3f * scale, 8, 8), MatrixTranslate(side * 0.8f * scale, yPos, 0));
+
+        // 2. NEW: ARMOR SHIELD (The Pauldron)
+        // RotateZ tilts it over the shoulder, RotateY angles it slightly forward
+        float shieldAngle = side * -25.0f; // Tilt outward
+        Matrix shieldRot = MatrixMultiply(MatrixRotateY(10 * DEG2RAD), MatrixRotateZ(shieldAngle * DEG2RAD));
+        // Offset it slightly above and outside the sphere center
+        Matrix shieldTrans = MatrixTranslate(xPos + (side * 0.1f * scale), yPos + (0.3f * scale), 0);
+        
+        mech.AddPart(CreateArmorPlate(0.6f * scale, 0.5f * scale, 0.1f * scale), 
+                    MatrixMultiply(shieldRot, shieldTrans));
+
+        // 3. Shoulder Actuator (The "Joint Cube")
+        mech.AddPart(GenMeshCube(0.4f * scale, 0.4f * scale, 0.4f * scale), 
+                    MatrixTranslate(xPos, yPos, 0));
+
+        // 4. The Armature (Horizontal Connector)
+        mech.AddPart(GenMeshCube(0.3f * scale, 0.2f * scale, 0.2f * scale), 
+                    MatrixTranslate(xPos + (side * 0.2f * scale), yPos, 0));
+
+        // 5. Weapon Systems (Plasma/Rockets)
+        if (side == -1) {
+            // Left Arm: Dual Plasma
+            Matrix weaponRot = MatrixMultiply(MatrixRotateX(90 * DEG2RAD), MatrixTranslate(xPos + (side * 0.3f * scale), yPos - 0.2f * scale, 0.4f * scale));
+            mech.AddPart(CreateSimpleCylinder(0.12f * scale, 1.2f * scale, 8), weaponRot);
+            Matrix weaponRot2 = MatrixMultiply(MatrixRotateX(90 * DEG2RAD), MatrixTranslate(xPos + (side * 0.15f * scale), yPos - 0.2f * scale, 0.4f * scale));
+            mech.AddPart(CreateSimpleCylinder(0.12f * scale, 1.2f * scale, 8), weaponRot2);
+        } else {
+            // Right Arm: Rocket Pod
+            Matrix podTransform = MatrixMultiply(MatrixRotateY(0), MatrixTranslate(xPos + (side * 0.3f * scale), yPos, 0.2f * scale));
+            mech.AddPart(CreateRocketPod(0.7f * scale, 0.8f * scale, 0.6f * scale), podTransform);
+        }
+    }
+    // Torso: Increased radius to 0.75f to look "heavy" and armored
+    mech.AddPart(CreateSimpleCylinder(0.75f * scale, 2.0f * scale, 6), MatrixTranslate(0, 4.0f * scale, 0));
     
-    // Shins: thinner, taller
-    mech.AddPart(CreateSimpleCylinder(0.18f * scale, 1.2f * scale, 6), MatrixTranslate(-0.35f * scale, 0.65f * scale, 0));
-    mech.AddPart(CreateSimpleCylinder(0.18f * scale, 1.2f * scale, 6), MatrixTranslate(0.35f * scale, 0.65f * scale, 0));
-    
-    // Thighs: thinner, taller
-    mech.AddPart(CreateSimpleCylinder(0.22f * scale, 1.4f * scale, 6), MatrixTranslate(-0.35f * scale, 1.95f * scale, 0));
-    mech.AddPart(CreateSimpleCylinder(0.22f * scale, 1.4f * scale, 6), MatrixTranslate(0.35f * scale, 1.95f * scale, 0));
-    
-    // Pelvis: compact, narrow
-    mech.AddPart(GenMeshCube(0.7f * scale, 0.4f * scale, 0.7f * scale), MatrixTranslate(0, 3.0f * scale, 0));
-    
-    // Torso: much thinner, taller for lankiness
-    mech.AddPart(CreateSimpleCylinder(0.55f * scale, 2.0f * scale, 6), MatrixTranslate(0, 4.0f * scale, 0));
-    
-    // Shoulders: smaller, positioned tighter to torso
-    mech.AddPart(CreateSimpleSphere(0.25f * scale, 8, 8), MatrixTranslate(-0.65f * scale, 4.8f * scale, 0));
-    mech.AddPart(CreateSimpleSphere(0.25f * scale, 8, 8), MatrixTranslate(0.65f * scale, 4.8f * scale, 0));
-    
-    // Weapons on shoulders: thinner, smaller
-    // Left weapon (cannon, rotated)
-    mech.AddPart(CreateSimpleCylinder(0.14f * scale, 1.0f * scale, 8),
-        MatrixMultiply(MatrixRotateX(75 * DEG2RAD), MatrixTranslate(-0.65f * scale, 4.6f * scale, 0.6f * scale)));
-    
-    // Right weapon (pod): smaller
-    mech.AddPart(GenMeshCube(0.4f * scale, 0.4f * scale, 0.7f * scale), MatrixTranslate(0.65f * scale, 4.5f * scale, 0.45f * scale));
-    
-    // Neck: thinner bridge
-    mech.AddPart(CreateSimpleCylinder(0.18f * scale, 0.35f * scale, 8), MatrixTranslate(0, 5.2f * scale, 0));
-    
-    // Head: smaller proportions (positioned so bottom touches neck top)
-    mech.AddPart(CreateMechHead(0.38f * scale, 0.45f * scale), MatrixTranslate(0, 5.375f * scale, 0.08f * scale));
+    // Neck and Head
+    mech.AddPart(CreateSimpleCylinder(0.2f * scale, 0.35f * scale, 8), MatrixTranslate(0, 5.2f * scale, 0));
+    mech.AddPart(CreateMechHead(0.45f * scale, 0.5f * scale), MatrixTranslate(0, 5.45f * scale, 0.12f * scale));
 
     return mech;
 }
@@ -470,9 +615,11 @@ static Mesh MergeMechParts(const ProceduralMech& mech) {
     mesh.triangleCount = static_cast<int>(indices.size() / 3);
     mesh.vertices = (float*)RL_MALLOC(verts.size() * sizeof(float));
     mesh.indices = (unsigned short*)RL_MALLOC(indices.size() * sizeof(unsigned short));
+    mesh.normals = (float*)RL_MALLOC(verts.size() * sizeof(float));
 
     std::memcpy(mesh.vertices, verts.data(), verts.size() * sizeof(float));
     std::memcpy(mesh.indices, indices.data(), indices.size() * sizeof(unsigned short));
+    std::fill(mesh.normals, mesh.normals + verts.size(), 0.0f);
 
     // Allocate dummy texcoords
     mesh.texcoords = (float*)RL_MALLOC((size_t)mesh.vertexCount * 2 * sizeof(float));

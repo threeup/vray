@@ -4,6 +4,16 @@ High-level implementation objectives focused on core game and rendering work.
 
 ---
 
+### G_C01: Card Tactics Core
+
+Introduce the 3-mech, 6-card-per-player tactical loop with mirroring rules (lateral swap; forward-only flips to backward). Support deterministic per-mech assignment of one card per turn with validation.
+
+### G_C02: Card UX & AI Baseline
+
+Deliver minimal UI for selecting/mirroring cards and assigning to mechs; add random AI card selection per mech; ensure card flow integrates with turn resolution and can be tested headlessly.
+
+---
+
 ### G_001: Build Deterministic Turn-Based Game Loop
 
 Implement core game simulation: turn execution, card sequencing, AI decision-making, and state validation. Game logic must be testable and reproducible independent of rendering.

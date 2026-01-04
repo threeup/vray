@@ -36,6 +36,7 @@ add_executable(tests
   tests/world_tests.cpp
   tests/entity_grid_tests.cpp
   tests/card_game_tests.cpp
+  src/boss.cpp
   src/platform/platform.cpp
   src/platform/raylib_window.cpp
   src/platform/raylib_input.cpp
