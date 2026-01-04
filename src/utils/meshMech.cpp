@@ -51,11 +51,11 @@ static Mesh CreateSimpleCylinder(float radius, float height, int slices) {
         int t1 = slices + 1 + i;
         int t2 = slices + 1 + i + 1;
         indices.push_back(b1);
-        indices.push_back(b2);
         indices.push_back(t1);
         indices.push_back(b2);
+        indices.push_back(b2);
+        indices.push_back(t1);
         indices.push_back(t2);
-        indices.push_back(t1);
     }
 
     // Bottom cap center

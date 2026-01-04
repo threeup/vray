@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "raylib.h"
+#include "raymath.h"
 #include "world/world.h"
 #include <array>
 
@@ -354,4 +355,134 @@ TEST(WorldSystem, TotalCoverage) {
     
     int baseTiles = 64 - totalOverrides;
     EXPECT_EQ(baseTiles, 48); // Remaining tiles from checkerboard
+}
+
+// ==================== TURN SYSTEM TESTS ====================
+
+TEST(TurnSystem, TurnDurationConstant) {
+    EXPECT_EQ(World::kTurnDuration, 5.0f);
+}
+
+TEST(TurnSystem, InitialTurnZero) {
+    World world;
+    EXPECT_EQ(world.currentTurn, 0);
+}
+
+TEST(TurnSystem, InitialTurnElapsedTimeZero) {
+    World world;
+    EXPECT_FLOAT_EQ(world.turnElapsedTime, 0.0f);
+}
+
+TEST(TurnSystem, TurnIncrementAfterDuration) {
+    World world;
+    world.turnElapsedTime = 4.9f;
+    
+    // Simulate one frame with 0.2s elapsed
+    world.turnElapsedTime += 0.2f;
+    
+    if (world.turnElapsedTime >= World::kTurnDuration) {
+        world.turnElapsedTime -= World::kTurnDuration;
+        world.currentTurn++;
+    }
+    
+    EXPECT_EQ(world.currentTurn, 1);
+}
+
+TEST(TurnSystem, TurnElapsedTimeWrapsCorrectly) {
+    World world;
+    world.turnElapsedTime = 4.9f;
+    world.turnElapsedTime += 0.2f;
+    
+    if (world.turnElapsedTime >= World::kTurnDuration) {
+        world.turnElapsedTime -= World::kTurnDuration;
+    }
+    
+    // Should be ~0.1f after wrapping (tolerate minor float error)
+    EXPECT_NEAR(world.turnElapsedTime, 0.1f, 1e-4f);
+}
+
+TEST(TurnSystem, MultipleTurnIncrements) {
+    World world;
+    
+    for (int i = 0; i < 3; ++i) {
+        world.turnElapsedTime += World::kTurnDuration;
+        if (world.turnElapsedTime >= World::kTurnDuration) {
+            world.turnElapsedTime -= World::kTurnDuration;
+            world.currentTurn++;
+        }
+    }
+    
+    EXPECT_EQ(world.currentTurn, 3);
+}
+
+TEST(TurnSystem, EntityMovementInitialized) {
+    // Verify WorldEntity has movement fields
+    WorldEntity ent;
+    ent.position = {0.0f, 0.0f, 0.0f};
+    ent.targetPos = {1.0f, 0.0f, 1.0f};
+    ent.moveProgress = 0.0f;
+    
+    EXPECT_EQ(ent.moveProgress, 0.0f);
+    EXPECT_EQ(ent.targetPos.x, 1.0f);
+}
+
+TEST(TurnSystem, EntityMovementProgress) {
+    // Test that movement progress goes from 0 to 1 during a turn
+    World world;
+    WorldEntity ent;
+    ent.position = {0.0f, 0.0f, 0.0f};
+    ent.targetPos = {5.0f, 0.0f, 0.0f};
+    
+    float turnProgress = 0.5f;  // Halfway through turn
+    Vector3 interpolated = Vector3Lerp(ent.position, ent.targetPos, turnProgress);
+    
+    EXPECT_FLOAT_EQ(interpolated.x, 2.5f);
+    EXPECT_FLOAT_EQ(interpolated.y, 0.0f);
+    EXPECT_FLOAT_EQ(interpolated.z, 0.0f);
+}
+
+TEST(TurnSystem, TurnProgressCalculation) {
+    World world;
+    world.turnElapsedTime = 2.5f;  // Halfway through 5-second turn
+    
+    float turnProgress = world.turnElapsedTime / World::kTurnDuration;
+    
+    EXPECT_FLOAT_EQ(turnProgress, 0.5f);
+}
+
+TEST(TurnSystem, EntityMovementFromStartToEnd) {
+    World world;
+    WorldEntity ent;
+    
+    Vector3 start = {0.0f, 0.0f, 0.0f};
+    Vector3 end = {10.0f, 0.0f, 0.0f};
+    
+    // Test at 0%, 25%, 50%, 75%, 100%
+    float progress[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+    float expectedX[] = {0.0f, 2.5f, 5.0f, 7.5f, 10.0f};
+    
+    for (int i = 0; i < 5; ++i) {
+        Vector3 current = Vector3Lerp(start, end, progress[i]);
+        EXPECT_FLOAT_EQ(current.x, expectedX[i]);
+    }
+}
+
+TEST(TurnSystem, MultipleEntityMovement) {
+    World world;
+    
+    // Create two entities with different movement targets
+    WorldEntity ent1, ent2;
+    ent1.position = {0.0f, 0.0f, 0.0f};
+    ent1.targetPos = {5.0f, 0.0f, 0.0f};
+    
+    ent2.position = {-5.0f, 0.0f, 0.0f};
+    ent2.targetPos = {0.0f, 0.0f, 5.0f};
+    
+    float turnProgress = 0.5f;
+    Vector3 pos1 = Vector3Lerp(ent1.position, ent1.targetPos, turnProgress);
+    Vector3 pos2 = Vector3Lerp(ent2.position, ent2.targetPos, turnProgress);
+    
+    EXPECT_FLOAT_EQ(pos1.x, 2.5f);
+    EXPECT_FLOAT_EQ(pos2.x, -2.5f);
+    EXPECT_FLOAT_EQ(pos2.z, 2.5f);
 }

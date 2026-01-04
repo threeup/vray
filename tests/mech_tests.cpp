@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "raylib.h"
 #include "raymath.h"
+#include "world/world.h"
 #include <cmath>
 
 // Forward declarations for mech functions
@@ -113,30 +114,46 @@ TEST(WorldUpdate, LightCycling) {
 
 // Test light position transitions
 TEST(WorldUpdate, LightTransitions) {
-    // Verify light moves correctly between all 4 positions in sequence
-    
+    // Verify light moves correctly through all four keyframes using World_Update
+    World world{};
+    world.activeLight = 0;
+    world.lightCount = 1;
+    world.lights[0].position = Vector3Zero();
+
+    auto stepAndGet = [&](float tSeconds) {
+        World_Update(world, tSeconds);
+        return world.lights[0].position;
+    };
+
     Vector3 noon = {-2.0f, 4.0f, -2.0f};
     Vector3 eastMorning = {4.0f, 2.0f, -2.0f};
     Vector3 southMorning = {-2.0f, 2.0f, 4.0f};
     Vector3 lateEvening = {-4.0f, 1.5f, -4.0f};
-    
-    // Simulate cycling through the full 10-second period
-    float period = 10.0f;
-    
-    // At t=0: should be at noon
-    float cycleT = 0.0f / period;
-    Vector3 light_0 = Vector3Lerp(noon, eastMorning, cycleT / 0.25f);
-    EXPECT_FLOAT_EQ(light_0.x, noon.x);
-    EXPECT_FLOAT_EQ(light_0.y, noon.y);
-    EXPECT_FLOAT_EQ(light_0.z, noon.z);
-    
-    // At t=2.5s (25% of cycle): should be at east morning
-    cycleT = 2.5f / period;
-    Vector3 light_25 = Vector3Lerp(eastMorning, southMorning, (cycleT - 0.25f) / 0.25f);
-    // Should be past east morning, moving toward south
-    EXPECT_LT(light_25.x, eastMorning.x); // Moving back west
-    EXPECT_LT(light_25.y, eastMorning.y); // Moving down
-    EXPECT_GT(light_25.z, eastMorning.z); // Moving south
+
+    Vector3 p0 = stepAndGet(0.0f);
+    EXPECT_FLOAT_EQ(p0.x, noon.x);
+    EXPECT_FLOAT_EQ(p0.y, noon.y);
+    EXPECT_FLOAT_EQ(p0.z, noon.z);
+
+    Vector3 p1 = stepAndGet(2.5f); // 25%
+    EXPECT_NEAR(p1.x, eastMorning.x, 1e-3f);
+    EXPECT_NEAR(p1.y, eastMorning.y, 1e-3f);
+    EXPECT_NEAR(p1.z, eastMorning.z, 1e-3f);
+
+    Vector3 p2 = stepAndGet(5.0f); // 50%
+    EXPECT_NEAR(p2.x, southMorning.x, 1e-3f);
+    EXPECT_NEAR(p2.y, southMorning.y, 1e-3f);
+    EXPECT_NEAR(p2.z, southMorning.z, 1e-3f);
+
+    Vector3 p3 = stepAndGet(7.5f); // 75%
+    EXPECT_NEAR(p3.x, lateEvening.x, 1e-3f);
+    EXPECT_NEAR(p3.y, lateEvening.y, 1e-3f);
+    EXPECT_NEAR(p3.z, lateEvening.z, 1e-3f);
+
+    Vector3 p4 = stepAndGet(10.0f); // wraps to noon again
+    EXPECT_NEAR(p4.x, noon.x, 1e-3f);
+    EXPECT_NEAR(p4.y, noon.y, 1e-3f);
+    EXPECT_NEAR(p4.z, noon.z, 1e-3f);
 }
 
 // Test mech vertex/index counts

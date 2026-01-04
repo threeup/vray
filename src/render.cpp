@@ -34,6 +34,7 @@ void Render_Init(AppContext& ctx) {
     // Post-Processing
     ctx.shaders.bloom = LoadShader(0, "assets/bloom.fs");
     ctx.shaders.pastel = LoadShader(0, "assets/pastel.fs");
+    ctx.shaders.palette = LoadShader(0, "assets/palette.fs");
 }
 
 
@@ -58,6 +59,9 @@ void Render_Cleanup(AppContext& ctx) {
     }
     if (ctx.shaders.pastel.id != 0) {
         UnloadShader(ctx.shaders.pastel);
+    }
+    if (ctx.shaders.palette.id != 0) {
+        UnloadShader(ctx.shaders.palette);
     }
     // Unload sphere
     if (ctx.models.sphere.meshCount > 0) {
@@ -175,14 +179,27 @@ void Render_DrawFrame(AppContext& ctx, World& world) {
     Render_DrawScene(ctx, world);
 
     // --- STEP 3: POST-PROCESS PASS (2D Effects) ---
-    
+    RenderTexture2D* src = &ctx.targets.scene;
+    RenderTexture2D* dst = &ctx.targets.post;
+
     // Pass A: Bloom (Scene -> Post)
     if (ctx.ui.bloomEnabled) {
         SetShaderValue(ctx.shaders.bloom, GetShaderLocation(ctx.shaders.bloom, "intensity"), &ctx.ui.bloomIntensity, SHADER_UNIFORM_FLOAT);
-        ApplyEffect(ctx.shaders.bloom, ctx.targets.scene, &ctx.targets.post, ctx.targets.width, ctx.targets.height);
+        ApplyEffect(ctx.shaders.bloom, *src, dst, ctx.targets.width, ctx.targets.height);
+        src = dst;
+        dst = &ctx.targets.scene; // ping-pong for subsequent passes
     } else {
-        // Simple copy if effect is off
-        ApplyCopy(ctx.targets.scene, &ctx.targets.post, ctx.targets.width, ctx.targets.height);
+        ApplyCopy(*src, dst, ctx.targets.width, ctx.targets.height);
+        src = dst;
+        dst = &ctx.targets.scene;
+    }
+
+    // Pass B: Optional palettized shading (ping-pong)
+    if (ctx.ui.paletteEnabled) {
+        SetShaderValue(ctx.shaders.palette, GetShaderLocation(ctx.shaders.palette, "strength"), &ctx.ui.paletteStrength, SHADER_UNIFORM_FLOAT);
+        ApplyEffect(ctx.shaders.palette, *src, dst, ctx.targets.width, ctx.targets.height);
+        src = dst;
+        dst = (dst == &ctx.targets.scene) ? &ctx.targets.post : &ctx.targets.scene;
     }
 
     // --- STEP 4: FINAL OUTPUT (Post -> Screen) ---
@@ -191,9 +208,9 @@ void Render_DrawFrame(AppContext& ctx, World& world) {
     
     if (ctx.ui.pastelEnabled) {
         SetShaderValue(ctx.shaders.pastel, GetShaderLocation(ctx.shaders.pastel, "intensity"), &ctx.ui.pastelIntensity, SHADER_UNIFORM_FLOAT);
-        ApplyEffect(ctx.shaders.pastel, ctx.targets.post, nullptr, ctx.window->GetWidth(), ctx.window->GetHeight());
+        ApplyEffect(ctx.shaders.pastel, *src, nullptr, ctx.window->GetWidth(), ctx.window->GetHeight());
     } else {
-        ApplyCopy(ctx.targets.post, nullptr, ctx.window->GetWidth(), ctx.window->GetHeight());
+        ApplyCopy(*src, nullptr, ctx.window->GetWidth(), ctx.window->GetHeight());
     }
 
     // Draw UI/HUD here (UI_Draw will overlay afterward)

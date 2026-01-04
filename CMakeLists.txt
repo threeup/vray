@@ -40,6 +40,14 @@ add_executable(tests
   src/platform/raylib_window.cpp
   src/platform/raylib_input.cpp
   src/platform/raylib_renderer.cpp
+  src/utils/meshMech.cpp
+  src/utils/meshGenerateUtils.cpp
+  src/utils/meshMathUtils.cpp
+  src/utils/meshProcessUtils.cpp
+  src/utils/meshExtraShapeUtils.cpp
+  src/utils/meshCompositeUtils.cpp
+  src/rlights_impl.cpp
+  src/world/world.cpp
   src/grid.cpp
   src/card.cpp
   src/game.cpp

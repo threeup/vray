@@ -68,6 +68,8 @@ UiActions UI_Draw(AppContext& ctx) {
     GuiCheckBox(toggleBloom, "Enable Bloom", &ctx.ui.bloomEnabled);
     Rectangle togglePastel = {colRight, baseY + rowH + rowGap, 20.0f, 20.0f};
     GuiCheckBox(togglePastel, "Enable Pastel", &ctx.ui.pastelEnabled);
+    Rectangle togglePalette = {colRight, baseY + 2*(rowH + rowGap), 20.0f, 20.0f};
+    GuiCheckBox(togglePalette, "Enable Palette", &ctx.ui.paletteEnabled);
     
     // Sliders row (separate spacing)
     float sliderY = baseY + 3*(rowH + rowGap) + 8.0f;
@@ -78,6 +80,11 @@ UiActions UI_Draw(AppContext& ctx) {
     DrawText("Pastel Intensity:", (int)(colRight - 40.0f), (int)sliderY, 16, DARKGRAY);
     Rectangle sliderPastel = {colRight + 120.0f, sliderY - 2.0f, 180.0f, 20.0f};
     GuiSlider(sliderPastel, nullptr, nullptr, &ctx.ui.pastelIntensity, 0.0f, 2.0f);
+
+    float sliderY2 = sliderY + rowH + rowGap;
+    DrawText("Palette Strength:", (int)(colRight - 40.0f), (int)sliderY2, 16, DARKGRAY);
+    Rectangle sliderPalette = {colRight + 120.0f, sliderY2 - 2.0f, 180.0f, 20.0f};
+    GuiSlider(sliderPalette, nullptr, nullptr, &ctx.ui.paletteStrength, 0.0f, 1.0f);
 
     return actions;
 }

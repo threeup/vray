@@ -13,17 +13,18 @@ void main() {
     vec3 norm = normalize(fragNormal);
     vec3 lightDir = normalize(lightPos - fragPosition);
     
-    // Diffuse
-    float diff = max(dot(norm, lightDir), 0.0);
+    // Wrap lighting to soften banding on flat faces
+    float ndl = dot(norm, lightDir);
+    float diff = clamp((ndl + 0.35) / 1.35, 0.0, 1.0); // shifts a bit of light into the terminator
     vec3 diffuse = diff * colDiffuse.rgb;
 
-    // Ambient (minimal specular - 1% metallic, 99% diffuse)
-    vec3 ambient = 0.2 * colDiffuse.rgb;
+    // Lift ambient so occluded areas still read
+    vec3 ambient = 0.35 * colDiffuse.rgb;
     
-    // Extremely subtle specular for barely-visible surface imperfection (0.1% metallic)
+    // Subtle specular: lower intensity and exponent to avoid tiny hot spots on weapons
     vec3 viewDir = normalize(viewPos - fragPosition);
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 128.0) * 0.01; // 0.01 = 1% metallic
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0) * 0.003; // 0.3% metallic
     vec3 specular = spec * vec3(1.0);
 
     finalColor = vec4(ambient + diffuse + specular, 1.0);

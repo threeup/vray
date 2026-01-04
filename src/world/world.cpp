@@ -18,8 +18,13 @@ static void AddEntity(World& world, Mesh mesh, Vector3 pos, Color tint, Shader s
     ent.model = LoadModelFromMesh(mesh);
     ent.model.materials[0].shader = shader;
     ent.position = pos;
+    ent.startPos = pos;
+    ent.targetPos = pos;  // Start at current position
     ent.scale = { 1.0f, 1.0f, 1.0f };
-    ent.color = tint; // Ensure your WorldEntity struct has a Color field!
+    ent.color = tint;
+    ent.id = static_cast<int>(world.entities.size());  // Simple ID assignment
+    ent.moveProgress = 0.0f;
+    ent.isEnemy = false;
 
     world.entities.push_back(ent);
 }
@@ -130,6 +135,18 @@ static void PlacePropsFromTiles(World& world, const AppContext& appCtx) {
 
 static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
     auto idx = [](int x, int y) { return y * World::kTilesWide + x; };
+    auto tileToWorldPos = [](int tx, int ty) -> Vector3 {
+        return { (tx - World::kTilesWide * 0.5f + 0.5f) * World::kTileSize,
+                 0.0f,  // Height will be set per tile
+                 (ty - World::kTilesHigh * 0.5f + 0.5f) * World::kTileSize };
+    };
+
+    auto tileToEntityPos = [&](int tx, int ty) -> Vector3 {
+        Vector3 p = tileToWorldPos(tx, ty);
+        p.y = TileHeight(world.tiles[idx(tx, ty)]) + 0.10f; // lift entity above slab
+        return p;
+    };
+    
     static Mesh mechMesh = { 0 };
     if (mechMesh.vertexCount == 0) {
         mechMesh = CreateMechMesh();
@@ -149,9 +166,43 @@ static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
                 AddEntity(world, mechMesh, pos, Color{80, 200, 120, 255}, appCtx.shaders.flat);
             } else if (occ == Occupant::Enemy) {
                 AddEntity(world, mechMesh, pos, Color{200, 90, 90, 255}, appCtx.shaders.flat);
+
+                WorldEntity& enemy = world.entities.back();
+                enemy.isEnemy = true;
+                enemy.startPos = pos;
+
+                // Clockwise square patrol: spawn -> right -> down -> left -> back up
+                const int x1 = (x + 1) % World::kTilesWide;
+                const int y1 = (y + 1) % World::kTilesHigh;
+
+                enemy.patrolPoints = {
+                    pos,
+                    tileToEntityPos(x1, y),
+                    tileToEntityPos(x1, y1),
+                    tileToEntityPos(x, y1)
+                };
+
+                enemy.patrolIndex = 1; // next waypoint is to the right
+                enemy.targetPos = enemy.patrolPoints[enemy.patrolIndex];
             }
         }
     }
+}
+
+static void AdvanceTurn(World& world) {
+    for (auto& entity : world.entities) {
+        entity.startPos = entity.targetPos; // assume it reached its target at turn boundary
+        entity.moveProgress = 0.0f;
+
+        if (entity.isEnemy) {
+            entity.patrolIndex = (entity.patrolIndex + 1) % static_cast<int>(entity.patrolPoints.size());
+            entity.targetPos = entity.patrolPoints[entity.patrolIndex];
+        } else {
+            entity.targetPos = entity.startPos;
+        }
+    }
+
+    world.currentTurn++;
 }
 
 void World_Init(World& world, const AppContext& appCtx) {
@@ -206,6 +257,23 @@ void World_Update(World& world, float elapsedTime) {
     }
     
     world.lights[world.activeLight].position = lightPos;
+    
+    // ==================== TURN SYSTEM ====================
+    world.turnElapsedTime += GetFrameTime();
+
+    // Advance turn when duration exceeded (catch up if frames run long)
+    while (world.turnElapsedTime >= World::kTurnDuration) {
+        world.turnElapsedTime -= World::kTurnDuration;
+        AdvanceTurn(world);
+    }
+    
+    // Update entity movement based on turn progress
+    float turnProgress = world.turnElapsedTime / World::kTurnDuration;  // [0, 1)
+    
+    for (auto& entity : world.entities) {
+        entity.moveProgress = turnProgress;
+        entity.position = Vector3Lerp(entity.startPos, entity.targetPos, turnProgress);
+    }
 }
 void World_DrawGround(const World& world, const AppContext& appCtx) {
     auto idx = [](int x, int y) { return y * World::kTilesWide + x; };

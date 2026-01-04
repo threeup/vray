@@ -20,6 +20,7 @@ struct RenderShaders {
     Shader flat{0};
     Shader bloom{0};
     Shader pastel{0};
+    Shader palette{0};
     Shader fxaa{0};
     Shader lighting{0};  // Lighting shader
     int lightDirLoc = -1;
@@ -53,6 +54,8 @@ struct UiState {
     float bloomIntensity = 1.0f;
     bool pastelEnabled = true;
     float pastelIntensity = 1.0f;
+    bool paletteEnabled = false;
+    float paletteStrength = 1.0f;
 };
 
 struct Game; // forward declare until game module exists

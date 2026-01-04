@@ -220,6 +220,7 @@ protected:
         }
         
         for (const auto& other : otherEntities) {
+            if (other.id == entity.id) continue; // ignore self
             if (isEntityAtGridPosition(other, gridX, gridY)) {
                 return false;
             }

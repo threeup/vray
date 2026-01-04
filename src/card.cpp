@@ -30,6 +30,7 @@ GameState applyCard(const GameState& state, const Card& card, int playerId) {
                 [playerId](const Entity& e) { return e.id == playerId; });
             if (it != newState.entities.end()) {
                 it->health += effect.heal;
+                if (it->health > 100) it->health = 100;
             }
             break;
         }
