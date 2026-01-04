@@ -50,5 +50,8 @@ struct World {
 // Build initial world entities/lights using shaders from AppContext
 void World_Init(World& world, const AppContext& appCtx);
 
+// Update world state (including light cycling)
+void World_Update(World& world, float elapsedTime);
+
 // Draw ground/grid for the world
-void World_DrawGround(const World& world);
+void World_DrawGround(const World& world, const AppContext& appCtx);

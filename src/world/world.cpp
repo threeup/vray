@@ -1,5 +1,6 @@
 #include "world.h"
 #include "mesh.h"
+#include "utils/meshMech.h"
 #include "rlights.h" // For CreateLight
 #include "raymath.h" // For Vector3Zero
 #include "app.h"     // For AppContext shaders
@@ -129,9 +130,10 @@ static void PlacePropsFromTiles(World& world, const AppContext& appCtx) {
 
 static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
     auto idx = [](int x, int y) { return y * World::kTilesWide + x; };
-
-    Mesh heroMesh = GenMeshCube(0.7f, 0.9f, 0.7f);
-    Mesh enemyMesh = GenMeshCube(0.7f, 0.7f, 0.7f);
+    static Mesh mechMesh = { 0 };
+    if (mechMesh.vertexCount == 0) {
+        mechMesh = CreateMechMesh();
+    }
 
     for (int y = 0; y < World::kTilesHigh; ++y) {
         for (int x = 0; x < World::kTilesWide; ++x) {
@@ -140,13 +142,13 @@ static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
 
             float baseY = TileHeight(world.tiles[idx(x, y)]) + 0.05f; // top of tile slab
             Vector3 pos = { (x - World::kTilesWide * 0.5f + 0.5f) * World::kTileSize,
-                            baseY + 0.45f,
+                            baseY + 0.05f,
                             (y - World::kTilesHigh * 0.5f + 0.5f) * World::kTileSize };
 
             if (occ == Occupant::Hero) {
-                AddEntity(world, heroMesh, pos, Color{80, 200, 120, 255}, appCtx.shaders.flat);
+                AddEntity(world, mechMesh, pos, Color{80, 200, 120, 255}, appCtx.shaders.flat);
             } else if (occ == Occupant::Enemy) {
-                AddEntity(world, enemyMesh, pos, Color{200, 90, 90, 255}, appCtx.shaders.flat);
+                AddEntity(world, mechMesh, pos, Color{200, 90, 90, 255}, appCtx.shaders.flat);
             }
         }
     }
@@ -169,10 +171,56 @@ void World_Init(World& world, const AppContext& appCtx) {
     world.lightCount = 1;
     world.activeLight = 0;
 }
-void World_DrawGround(const World& world) {
+
+void World_Update(World& world, float elapsedTime) {
+    // Cycle light position in a 10-second loop
+    const float cyclePeriod = 10.0f;
+    float cycleT = fmodf(elapsedTime, cyclePeriod) / cyclePeriod;  // [0, 1)
+    
+    Vector3 lightPos;
+    
+    if (cycleT < 0.25f) {
+        // 0-2.5s: Interpolate from noon (0) to east morning (0.25)
+        float t = cycleT / 0.25f;  // [0, 1)
+        Vector3 noon = {-2.0f, 4.0f, -2.0f};
+        Vector3 eastMorning = {4.0f, 2.0f, -2.0f};
+        lightPos = Vector3Lerp(noon, eastMorning, t);
+    } else if (cycleT < 0.5f) {
+        // 2.5-5s: Interpolate from east morning (0.25) to south morning (0.5)
+        float t = (cycleT - 0.25f) / 0.25f;  // [0, 1)
+        Vector3 eastMorning = {4.0f, 2.0f, -2.0f};
+        Vector3 southMorning = {-2.0f, 2.0f, 4.0f};
+        lightPos = Vector3Lerp(eastMorning, southMorning, t);
+    } else if (cycleT < 0.75f) {
+        // 5-7.5s: Interpolate from south morning (0.5) to late evening (0.75)
+        float t = (cycleT - 0.5f) / 0.25f;  // [0, 1)
+        Vector3 southMorning = {-2.0f, 2.0f, 4.0f};
+        Vector3 lateEvening = {-4.0f, 1.5f, -4.0f};
+        lightPos = Vector3Lerp(southMorning, lateEvening, t);
+    } else {
+        // 7.5-10s: Interpolate from late evening (0.75) back to noon (1.0)
+        float t = (cycleT - 0.75f) / 0.25f;  // [0, 1)
+        Vector3 lateEvening = {-4.0f, 1.5f, -4.0f};
+        Vector3 noon = {-2.0f, 4.0f, -2.0f};
+        lightPos = Vector3Lerp(lateEvening, noon, t);
+    }
+    
+    world.lights[world.activeLight].position = lightPos;
+}
+void World_DrawGround(const World& world, const AppContext& appCtx) {
     auto idx = [](int x, int y) { return y * World::kTilesWide + x; };
 
     constexpr float slabThickness = 0.80f;
+
+    // Build a reusable tile model once to ensure the flat shader is applied (matte, no specular)
+    static Model tileModel = { 0 };
+    static bool tileModelInit = false;
+    if (!tileModelInit) {
+        Mesh cube = GenMeshCube(1.0f, 1.0f, 1.0f);
+        tileModel = LoadModelFromMesh(cube);
+        tileModel.materials[0].shader = appCtx.shaders.flat;
+        tileModelInit = true;
+    }
 
     for (int y = 0; y < World::kTilesHigh; ++y) {
         for (int x = 0; x < World::kTilesWide; ++x) {
@@ -186,10 +234,10 @@ void World_DrawGround(const World& world) {
                             h + slabThickness * 0.5f,
                             (y - World::kTilesHigh * 0.5f + 0.5f) * World::kTileSize };
 
-            DrawCube(pos, size.x, size.y, size.z, c);
+            // Draw using the flat shader (matte) with non-uniform scale
+            DrawModelEx(tileModel, pos, Vector3{0, 1, 0}, 0.0f, size, c);
 
-            // Outline
-            DrawCubeWires(pos, size.x, size.y + 0.001f, size.z, Color{60, 60, 60, 255});
+            // Outline removed to avoid bright edges when using default wireframe shader
         }
     }
 }

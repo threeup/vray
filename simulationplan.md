@@ -1,32 +1,29 @@
-Into the Breach Simulation (Visuals & Mechanics)
+Simulation (Visuals & Mechanics)
 
-0. Achieving the Visuals
+1. Achieving the Visuals
 
 Palettized Shading: Use a custom shader that snaps lighting levels to 3 or 4 brightness steps. This creates the sharp color bands seen on the rock.
 
-1. Mountain mesh generation
+- Note: Add a palette/posterize pass to xflat.fs (or a tiny post-process) that clamps diffuse/ambient to 3–4 bands while keeping specular at ~1% so edges stay crisp but matte.
 
-   - Replace generic cubes with asymmetric low-poly clusters using `createCustomOctahedron` or `createSpikyBlobMesh` for jagged peaks.
-   - Stack/layer octahedra at different scales to build a more natural rocky formation.
-   - Keep brown/gray tints but use vertex AO for depth.
+2. Replace monsters with mech meshes (meshMech.cpp wiring)
 
-2. Reduce shader reflectivity
+   - Fix includes: pull in raylib, raymath, mesh headers, and std headers; ensure all Mesh/Model/Matrix identifiers resolve.
+   - Build modular parts (head, torso, legs, pods) as Mesh + local Matrix; store parts in a struct and compose with MatrixMultiply + MatrixTranslate/Rotate.
+   - Bake each assembled mech into a Model via LoadModelFromMesh or keep parts and draw with DrawModel using per-part transforms; assign the flat shader to all mech materials.
+   - Tint: enemies use red/brown palette; heroes use green/blue palette; keep scale to fit one tile footprint (<= tile size, height ~1.0f).
 
-   - Switch from flat shader to a matte/diffuse-only pass; lower or remove any specular highlights.
-   - Ensure ground tiles, props, and actors all use the toned-down lighting model (no metallic gloss).
-   - Verify emissive windows on skyscrapers still shine through.
+3. Integrate mechs into world entities
 
-3. Hero model variation
+   - Swap hero/enemy spawn to use the mech models instead of cubes in PlaceActorsFromOccupants.
+   - Cache mech models once (static in World_Init) and reuse; set `model.materials[0].shader = appCtx.shaders.flat` to stay matte.
+   - Position: anchor feet at tile top (TileHeight + small offset), center on tile; allow per-entity color tints.
 
-   - Replace hero cubes with stylized shapes: use `createCustomOctahedron`, `createCustomTetrahedron`, or `createCubicStar` for distinct silhouettes.
-   - Keep green tint but assign one shape per hero for quick visual ID.
-   - Maintain scale so they fit on tiles without clipping.
+4. Validate and test the mech pipeline
 
-4. Enemy model variation
-
-   - Replace enemy cubes with different stylized shapes (e.g., twisted columns via `createTwistedColumnMesh`).
-   - Keep red tint but use a distinct form from heroes (spiky blob, pentagonal prism, etc.).
-   - Match scale/footprint to tiles.
+   - Run ./go.ps1; ensure meshMech.cpp compiles cleanly with all raylib symbols resolved.
+   - Visually verify: no missing parts, normals correct, matte shading consistent with tiles/mountains.
+   - Optional: add MeshUtils::checkIsValid on generated meshes before upload to catch bad normals or NaNs.
 
 5. Game tick timer and turn system
 

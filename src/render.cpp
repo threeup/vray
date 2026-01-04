@@ -101,7 +101,9 @@ static void ApplyGlobalUniforms(AppContext& ctx, const World& world) {
 
     if (world.lightCount > 0) {
         const Light& mainLight = world.lights[world.activeLight];
-        UpdateLightValues(ctx.shaders.flat, mainLight);
+        // Manually set lightPos for the flat shader
+        float lightPos[3] = { mainLight.position.x, mainLight.position.y, mainLight.position.z };
+        SetShaderValue(ctx.shaders.flat, ctx.shaders.flatLightPosLoc, lightPos, SHADER_UNIFORM_VEC3);
     }
 }
 
@@ -147,7 +149,7 @@ static void Render_DrawScene(AppContext& app, const World& world) {
 
             // 2. Draw the environment
             if (app.ui.showEnvironment) {
-                World_DrawGround(world);
+                World_DrawGround(world, app);
             }
 
             // 3. Draw Light Indicator (The Toggle)

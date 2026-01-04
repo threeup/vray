@@ -82,14 +82,18 @@ int main() {
         // Build world using render shaders
         World world{};
         World_Init(world, ctx);
+        
+        float totalElapsedTime = 0.0f;
 
         try {
             while (!platform.window->ShouldClose()) {
                 float dt = GetFrameTime();
+                totalElapsedTime += dt;
 
                 // --- Update ---
                 updateCamera(ctx.camera);
                 update_game(game, dt);
+                World_Update(world, totalElapsedTime);
 
                 handle_input(game, platform);
 

@@ -30,30 +30,24 @@ list(FILTER VRAY_SOURCES EXCLUDE REGEX "src/test\\.cpp")
 
 add_executable(vray_demo ${VRAY_SOURCES})
 
-add_executable(smoke_tests
+add_executable(tests
   tests/smoke_tests.cpp
+  tests/mech_tests.cpp
+  tests/world_tests.cpp
+  tests/entity_grid_tests.cpp
+  tests/card_game_tests.cpp
   src/platform/platform.cpp
   src/platform/raylib_window.cpp
   src/platform/raylib_input.cpp
   src/platform/raylib_renderer.cpp
-)
-
-# Lightweight mesh sanity tests
-add_executable(mesh_tests
-  src/test.cpp
-  src/utils/meshGenerateUtils.cpp
-  src/utils/meshMathUtils.cpp
-  src/utils/meshProcessUtils.cpp
-  src/utils/meshExtraShapeUtils.cpp
-  src/utils/meshCompositeUtils.cpp
+  src/grid.cpp
+  src/card.cpp
+  src/game.cpp
 )
 
 # Shared include path and defines
-target_include_directories(mesh_tests PRIVATE src)
-target_compile_definitions(mesh_tests PRIVATE _CRT_SECURE_NO_WARNINGS)
-
-target_include_directories(smoke_tests PRIVATE src)
-target_compile_definitions(smoke_tests PRIVATE _CRT_SECURE_NO_WARNINGS)
+target_include_directories(tests PRIVATE src)
+target_compile_definitions(tests PRIVATE _CRT_SECURE_NO_WARNINGS)
 
 # Set the root source directory for includes
 target_include_directories(vray_demo PRIVATE src)
@@ -70,12 +64,11 @@ endif()
 
 if(DEFINED RAYLIB_TARGET)
   target_link_libraries(vray_demo PRIVATE ${RAYLIB_TARGET})
-  target_link_libraries(mesh_tests PRIVATE ${RAYLIB_TARGET})
-  target_link_libraries(smoke_tests PRIVATE ${RAYLIB_TARGET})
+  target_link_libraries(tests PRIVATE ${RAYLIB_TARGET})
 endif()
 
-target_link_libraries(smoke_tests PRIVATE gtest_main)
-add_test(NAME smoke_tests COMMAND smoke_tests)
+target_link_libraries(tests PRIVATE gtest_main)
+add_test(NAME tests COMMAND tests)
 
 # Helpful build type
 if(NOT CMAKE_BUILD_TYPE)

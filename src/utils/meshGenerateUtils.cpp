@@ -13,11 +13,155 @@ Mesh createCubeMesh(float size) {
 }
 
 Mesh createSphereMesh(float radius, int rings, int slices) {
-    return GenMeshSphere(radius, rings, slices);
+    std::vector<float> vertices;
+    std::vector<unsigned short> indices;
+
+    // Clamp slices/rings to valid ranges
+    slices = (slices < 3) ? 3 : slices;
+    rings = (rings < 2) ? 2 : rings;
+
+    // Generate sphere vertices using spherical coordinates
+    for (int r = 0; r <= rings; r++) {
+        float phi = PI * r / rings;  // Vertical angle
+        for (int s = 0; s <= slices; s++) {
+            float theta = 2.0f * PI * s / slices;  // Horizontal angle
+            
+            float x = radius * sinf(phi) * cosf(theta);
+            float y = radius * cosf(phi);
+            float z = radius * sinf(phi) * sinf(theta);
+            
+            vertices.push_back(x);
+            vertices.push_back(y);
+            vertices.push_back(z);
+        }
+    }
+
+    // Generate indices
+    for (int r = 0; r < rings; r++) {
+        for (int s = 0; s < slices; s++) {
+            int v1 = r * (slices + 1) + s;
+            int v2 = v1 + 1;
+            int v3 = (r + 1) * (slices + 1) + s;
+            int v4 = v3 + 1;
+
+            // First triangle
+            indices.push_back(v1);
+            indices.push_back(v3);
+            indices.push_back(v2);
+
+            // Second triangle
+            indices.push_back(v2);
+            indices.push_back(v3);
+            indices.push_back(v4);
+        }
+    }
+
+    // Create mesh
+    Mesh mesh = { 0 };
+    mesh.vertexCount = (int)vertices.size() / 3;
+    mesh.triangleCount = (int)indices.size() / 3;
+    mesh.vertices = (float*)RL_MALLOC(vertices.size() * sizeof(float));
+    mesh.indices = (unsigned short*)RL_MALLOC(indices.size() * sizeof(unsigned short));
+    mesh.texcoords = (float*)RL_MALLOC((size_t)mesh.vertexCount * 2 * sizeof(float));
+    
+    std::memcpy(mesh.vertices, vertices.data(), vertices.size() * sizeof(float));
+    std::memcpy(mesh.indices, indices.data(), indices.size() * sizeof(unsigned short));
+    std::fill(mesh.texcoords, mesh.texcoords + mesh.vertexCount * 2, 0.0f);
+
+    return mesh;
 }
 
 Mesh createCylinderMesh(float radius, float height, int slices) {
-    return GenMeshCylinder(radius, height, slices);
+    std::vector<float> vertices;
+    std::vector<unsigned short> indices;
+
+    // Clamp slices to valid range
+    slices = (slices < 3) ? 3 : slices;
+
+    // Create top and bottom rings
+    float halfHeight = height / 2.0f;
+
+    // Bottom ring
+    for (int i = 0; i <= slices; i++) {
+        float angle = 2.0f * PI * i / slices;
+        float x = radius * cosf(angle);
+        float z = radius * sinf(angle);
+        
+        vertices.push_back(x);
+        vertices.push_back(-halfHeight);
+        vertices.push_back(z);
+    }
+
+    // Top ring
+    for (int i = 0; i <= slices; i++) {
+        float angle = 2.0f * PI * i / slices;
+        float x = radius * cosf(angle);
+        float z = radius * sinf(angle);
+        
+        vertices.push_back(x);
+        vertices.push_back(halfHeight);
+        vertices.push_back(z);
+    }
+
+    // Generate side indices
+    for (int i = 0; i < slices; i++) {
+        int b1 = i;
+        int b2 = i + 1;
+        int t1 = slices + 1 + i;
+        int t2 = slices + 1 + i + 1;
+
+        // First triangle
+        indices.push_back(b1);
+        indices.push_back(t1);
+        indices.push_back(b2);
+
+        // Second triangle
+        indices.push_back(b2);
+        indices.push_back(t1);
+        indices.push_back(t2);
+    }
+
+    // Bottom cap center
+    int bottomCenterIdx = vertices.size() / 3;
+    vertices.push_back(0.0f);
+    vertices.push_back(-halfHeight);
+    vertices.push_back(0.0f);
+
+    // Top cap center
+    int topCenterIdx = vertices.size() / 3;
+    vertices.push_back(0.0f);
+    vertices.push_back(halfHeight);
+    vertices.push_back(0.0f);
+
+    // Bottom cap triangles
+    for (int i = 0; i < slices; i++) {
+        indices.push_back(bottomCenterIdx);
+        indices.push_back(i + 1);
+        indices.push_back(i);
+    }
+
+    // Top cap triangles
+    for (int i = 0; i < slices; i++) {
+        int t1 = slices + 1 + i;
+        int t2 = slices + 1 + i + 1;
+        indices.push_back(topCenterIdx);
+        indices.push_back(t2);
+        indices.push_back(t1);
+    }
+
+    // Create mesh
+    Mesh mesh = { 0 };
+    mesh.vertexCount = (int)vertices.size() / 3;
+    mesh.triangleCount = (int)indices.size() / 3;
+    mesh.vertices = (float*)RL_MALLOC(vertices.size() * sizeof(float));
+    mesh.indices = (unsigned short*)RL_MALLOC(indices.size() * sizeof(unsigned short));
+    mesh.texcoords = (float*)RL_MALLOC((size_t)mesh.vertexCount * 2 * sizeof(float));
+    
+    std::memcpy(mesh.vertices, vertices.data(), vertices.size() * sizeof(float));
+    std::memcpy(mesh.indices, indices.data(), indices.size() * sizeof(unsigned short));
+    std::fill(mesh.texcoords, mesh.texcoords + mesh.vertexCount * 2, 0.0f);
+
+    return mesh;
 }
 
 Mesh createLowPolySphereMesh(float radius, int rings, int slices, float noiseAmount) {

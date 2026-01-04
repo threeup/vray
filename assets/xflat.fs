@@ -20,7 +20,7 @@ void main() {
     // Ambient (minimal specular - 1% metallic, 99% diffuse)
     vec3 ambient = 0.2 * colDiffuse.rgb;
     
-    // Extremely subtle specular for barely-visible surface imperfection (1% metallic)
+    // Extremely subtle specular for barely-visible surface imperfection (0.1% metallic)
     vec3 viewDir = normalize(viewPos - fragPosition);
     vec3 reflectDir = reflect(-lightDir, norm);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 128.0) * 0.01; // 0.01 = 1% metallic
