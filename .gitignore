@@ -28,6 +28,7 @@ cmake_build_release/
 
 # Build and dependencies
 build/
+out/
 third_party/
 
 # OS files

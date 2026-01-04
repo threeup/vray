@@ -25,22 +25,10 @@ else()
   endif()
 endif()
 
-add_executable(vray_demo
-  src/main.cpp
-  src/grid.cpp
-  src/mesh.cpp
-  src/card.cpp
-  src/camControl.cpp
-  src/render.cpp
-  src/game.cpp
-  src/ui.cpp
-  src/character_renderer.cpp
-  # Platform implementation files
-  src/platform/platform.cpp
-  src/platform/raylib_window.cpp
-  src/platform/raylib_input.cpp
-  src/platform/raylib_renderer.cpp
-)
+file(GLOB_RECURSE VRAY_SOURCES "src/*.cpp")
+list(FILTER VRAY_SOURCES EXCLUDE REGEX "src/test\\.cpp")
+
+add_executable(vray_demo ${VRAY_SOURCES})
 
 add_executable(smoke_tests
   tests/smoke_tests.cpp
@@ -53,7 +41,11 @@ add_executable(smoke_tests
 # Lightweight mesh sanity tests
 add_executable(mesh_tests
   src/test.cpp
-  src/mesh.cpp
+  src/utils/meshGenerateUtils.cpp
+  src/utils/meshMathUtils.cpp
+  src/utils/meshProcessUtils.cpp
+  src/utils/meshExtraShapeUtils.cpp
+  src/utils/meshCompositeUtils.cpp
 )
 
 # Shared include path and defines

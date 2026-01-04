@@ -12,8 +12,8 @@ static void unload_targets(RenderTargets& rt) {
 }
 
 void init_app(AppContext& ctx, int width, int height) {
-    ctx.window.width = width;
-    ctx.window.height = height;
+    ctx.targets.width = width;
+    ctx.targets.height = height;
     ctx.targets.scale = 1.0f;
     ctx.ui.supersample2x = false;
     ctx.ui.fxaa = true;
@@ -23,8 +23,8 @@ void init_app(AppContext& ctx, int width, int height) {
 
 void rebuild_render_targets(AppContext& ctx, float scale, int width, int height) {
     ctx.targets.scale = scale;
-    ctx.window.width = width;
-    ctx.window.height = height;
+    ctx.targets.width = width;
+    ctx.targets.height = height;
 
     int rtWidth = static_cast<int>(width * scale);
     int rtHeight = static_cast<int>(height * scale);
