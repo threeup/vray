@@ -8,6 +8,7 @@
 #include "camControl.h"
 #include "render.h"
 #include "ui.h"
+#include "world/world.h"
 #include <cmath>
 #include <string>
 #include <fstream>
@@ -78,6 +79,10 @@ int main() {
         // Initialize rendering systems
         Render_Init(ctx);
 
+        // Build world using render shaders
+        World world{};
+        World_Init(world, ctx);
+
         try {
             while (!platform.window->ShouldClose()) {
                 float dt = GetFrameTime();
@@ -98,7 +103,8 @@ int main() {
                 }
 
                 // --- Draw ---
-                Render_DrawFrame(ctx);
+                platform.window->BeginFrame();
+                Render_DrawFrame(ctx, world);
 
                 UiActions uiActions = UI_Draw(ctx);
 

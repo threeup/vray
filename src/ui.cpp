@@ -38,37 +38,45 @@ UiActions UI_Draw(AppContext& ctx) {
     }
 
     // --- Render Controls Panel (Bottom) ---
-    float panelHeight = 170.0f;
+    float panelHeight = 200.0f;
     Rectangle renderPanel = {10, (float)winH - panelHeight - 10, (float)winW - 20.0f, panelHeight};
     GuiPanel(renderPanel, "Render Controls");
-    
-    // Row 1: Entity/Environment toggles
-    Rectangle toggleEntities = {renderPanel.x + 20.0f, renderPanel.y + 25.0f, 180.0f, 20.0f};
-    GuiToggle(toggleEntities, "Render Entities", &ctx.ui.showEntities);
-    Rectangle toggleEnv = {renderPanel.x + 20.0f, renderPanel.y + 50.0f, 180.0f, 20.0f};
-    GuiToggle(toggleEnv, "Render Environment", &ctx.ui.showEnvironment);
 
-    // Row 2: AA and Bloom toggles
-    Rectangle checkbox1 = {renderPanel.x + 220.0f, renderPanel.y + 25.0f, 20.0f, 20.0f};
+    const float baseY = renderPanel.y + 20.0f;
+    const float rowH = 24.0f;
+    const float rowGap = 6.0f;
+    const float colLeft = renderPanel.x + 16.0f;
+    const float colMid = renderPanel.x + 230.0f;
+    const float colRight = renderPanel.x + 520.0f;
+
+    // Row 1: Entity/Environment/Light toggles (left column)
+    Rectangle toggleEntities = {colLeft, baseY, 180.0f, rowH};
+    GuiToggle(toggleEntities, "Render Entities", &ctx.ui.showEntities);
+    Rectangle toggleEnv = {colLeft, baseY + rowH + rowGap, 180.0f, rowH};
+    GuiToggle(toggleEnv, "Render Environment", &ctx.ui.showEnvironment);
+    Rectangle toggleLight = {colLeft, baseY + 2*(rowH + rowGap), 180.0f, rowH};
+    GuiToggle(toggleLight, "Light Indicator", &ctx.ui.showLightIndicator);
+
+    // Row 1-3: AA/Bloom toggles (middle column)
+    Rectangle checkbox1 = {colMid, baseY, 20.0f, 20.0f};
     GuiCheckBox(checkbox1, "MSAA-ish (Supersample 2x ~4x samples)", &ctx.ui.supersample2x);
-    Rectangle checkbox2 = {renderPanel.x + 220.0f, renderPanel.y + 50.0f, 20.0f, 20.0f};
+    Rectangle checkbox2 = {colMid, baseY + rowH + rowGap, 20.0f, 20.0f};
     GuiCheckBox(checkbox2, "FXAA", &ctx.ui.fxaa);
-    
-    // Row 3: Post-processing toggles
-    Rectangle toggleBloom = {renderPanel.x + 520.0f, renderPanel.y + 25.0f, 20.0f, 20.0f};
+
+    // Row 1-3: Post-processing toggles (right column)
+    Rectangle toggleBloom = {colRight, baseY, 20.0f, 20.0f};
     GuiCheckBox(toggleBloom, "Enable Bloom", &ctx.ui.bloomEnabled);
-    Rectangle togglePastel = {renderPanel.x + 520.0f, renderPanel.y + 50.0f, 20.0f, 20.0f};
+    Rectangle togglePastel = {colRight, baseY + rowH + rowGap, 20.0f, 20.0f};
     GuiCheckBox(togglePastel, "Enable Pastel", &ctx.ui.pastelEnabled);
     
-    // Row 4: Bloom and Pastel intensity sliders
-    Rectangle sliderBloomLabel = {renderPanel.x + 20.0f, renderPanel.y + 80.0f, 100.0f, 20.0f};
-    DrawText("Bloom Intensity:", (int)sliderBloomLabel.x, (int)sliderBloomLabel.y, 16, DARKGRAY);
-    Rectangle sliderBloom = {renderPanel.x + 150.0f, renderPanel.y + 80.0f, 150.0f, 20.0f};
+    // Sliders row (separate spacing)
+    float sliderY = baseY + 3*(rowH + rowGap) + 8.0f;
+    DrawText("Bloom Intensity:", (int)(colLeft), (int)sliderY, 16, DARKGRAY);
+    Rectangle sliderBloom = {colLeft + 140.0f, sliderY - 2.0f, 180.0f, 20.0f};
     GuiSlider(sliderBloom, nullptr, nullptr,  &ctx.ui.bloomIntensity, 0.0f, 2.0f);
     
-    Rectangle sliderPastelLabel = {renderPanel.x + 320.0f, renderPanel.y + 80.0f, 100.0f, 20.0f};
-    DrawText("Pastel Intensity:", (int)sliderPastelLabel.x, (int)sliderPastelLabel.y, 16, DARKGRAY);
-    Rectangle sliderPastel = {renderPanel.x + 450.0f, renderPanel.y + 80.0f, 150.0f, 20.0f};
+    DrawText("Pastel Intensity:", (int)(colRight - 40.0f), (int)sliderY, 16, DARKGRAY);
+    Rectangle sliderPastel = {colRight + 120.0f, sliderY - 2.0f, 180.0f, 20.0f};
     GuiSlider(sliderPastel, nullptr, nullptr, &ctx.ui.pastelIntensity, 0.0f, 2.0f);
 
     return actions;

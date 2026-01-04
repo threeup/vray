@@ -12,4 +12,7 @@ void computeMeshNormals(Mesh* mesh);
 // Converts indexed mesh to non-indexed, expanding vertices
 void unshareMeshVertices(Mesh* mesh);
 
+// Validate mesh integrity - returns true if valid, throws error if not
+bool checkIsValid(const Mesh& mesh);
+
 } // namespace MeshUtils

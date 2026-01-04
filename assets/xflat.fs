@@ -17,14 +17,14 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * colDiffuse.rgb;
 
-    // Specular (The sharp white circles)
+    // Ambient (minimal specular - 1% metallic, 99% diffuse)
+    vec3 ambient = 0.2 * colDiffuse.rgb;
+    
+    // Extremely subtle specular for barely-visible surface imperfection (1% metallic)
     vec3 viewDir = normalize(viewPos - fragPosition);
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0); // Adjust 32.0 for circle size
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 128.0) * 0.01; // 0.01 = 1% metallic
     vec3 specular = spec * vec3(1.0);
-
-    // Ambient
-    vec3 ambient = 0.2 * colDiffuse.rgb;
 
     finalColor = vec4(ambient + diffuse + specular, 1.0);
 }

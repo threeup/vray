@@ -4,6 +4,8 @@
 #include <cmath>
 #include <vector>
 #include <map>
+#include <raymath.h>
+#include <stdexcept>
 
 namespace MeshGenerator {
 
@@ -78,6 +80,161 @@ Mesh createCustomIcosphere(float radius, int subdivisions)
     int levels = MeshUtils::clampSubdiv(subdivisions);
     MeshUtils::PolySoup refined = MeshUtils::subdivideSoup(soup, levels, true);
     return MeshUtils::bakeSoupToSphere(refined, radius);
+}
+
+
+
+
+Mesh createAsymmetricConeMesh(float baseRadius, float height, int slices, float asymmetryAmount) {
+    // Start with a cone, unshare vertices for flat shading, then perturb for asymmetry
+    Mesh mesh = GenMeshCone(baseRadius, height, slices);
+    
+    if (!mesh.vertices || mesh.vertexCount <= 0) {
+        throw std::runtime_error("createAsymmetricConeMesh: GenMeshCone failed");
+    }
+    
+    // Unshare vertices and compute proper normals
+    MeshUtils::unshareMeshVertices(&mesh);
+    
+    if (!mesh.vertices || !mesh.normals) {
+        throw std::runtime_error("createAsymmetricConeMesh: unshareMeshVertices failed");
+    }
+    
+    float* verts = mesh.vertices;
+    
+    // Perturb vertices for jagged/rocky asymmetry (skip base)
+    for (int i = 0; i < mesh.vertexCount; ++i) {
+        float y = verts[i * 3 + 1];
+        
+        // Skip vertices near base (don't perturb bottom)
+        if (y < -height * 0.3f) continue;
+        
+        float x = verts[i * 3 + 0];
+        float z = verts[i * 3 + 2];
+        
+        // Random asymmetric offset
+        float r = MeshUtils::pseudoRandom01(i * 13 + 5);
+        float offset = (r - 0.5f) * height * asymmetryAmount * 0.3f;
+        
+        // Scale outward from center axis
+        float dist = sqrtf(x * x + z * z);
+        if (dist > 0.01f) {
+            float scale = 1.0f + offset / dist * 0.2f;
+            verts[i * 3 + 0] = x * scale;
+            verts[i * 3 + 2] = z * scale;
+        }
+        
+        // Slight height variation
+        verts[i * 3 + 1] += offset * 0.15f;
+    }
+    
+    // Recompute normals after perturbation
+    MeshUtils::computeMeshNormals(&mesh);
+    
+    // Validate mesh before returning
+    MeshUtils::checkIsValid(mesh);
+    
+    return mesh;
+}
+
+Mesh createCraggyMountain(float baseRadius, float height, int slices) {
+    std::vector<float> vertices;
+    std::vector<unsigned short> indices;
+
+    // We will create 3 rings: Base (y=0), Mid (y=height*0.5), Top (y=height)
+    int vertexCount = slices * 3 + 1; // 3 rings + 1 center bottom
+    
+    auto getPos = [&](int ring, int slice) {
+        float hPercent = (float)ring / 2.0f; // 0.0, 0.5, 1.0
+        float rPercent = 1.0f - (hPercent * 0.8f); // Tapers inward as it goes up
+        
+        float angle = slice * (2.0f * PI / slices);
+        
+        // Add "craggy" jitter
+        float noise = MeshUtils::pseudoRandom01(slice * 13 + ring * 7);
+        float jitterR = baseRadius * 0.2f * (noise - 0.5f);
+        
+        float x = (baseRadius * rPercent + jitterR) * cosf(angle);
+        float z = (baseRadius * rPercent + jitterR) * sinf(angle);
+        float y = height * hPercent + (noise * height * 0.1f);
+        
+        return Vector3{ x, y, z };
+    };
+
+    // 1. Generate Vertices
+    for (int r = 0; r < 3; r++) {
+        for (int s = 0; s < slices; s++) {
+            Vector3 p = getPos(r, s);
+            vertices.push_back(p.x); vertices.push_back(p.y); vertices.push_back(p.z);
+        }
+    }
+    vertices.push_back(0); vertices.push_back(0); vertices.push_back(0); // Center base
+    vertices.push_back(0); vertices.push_back(height); vertices.push_back(0); // Center top
+
+    // 2. Generate Indices
+    // Ring 0→1 and Ring 1→2 (quads split into triangles)
+    for (int r = 0; r < 2; r++) {
+        for (int s = 0; s < slices; s++) {
+            int next = (s + 1) % slices;
+            int currentRing = r * slices;
+            int nextRing = (r + 1) * slices;
+
+            // Triangle 1
+            indices.push_back(currentRing + s);
+            indices.push_back(nextRing + s);
+            indices.push_back(nextRing + next);
+            // Triangle 2
+            indices.push_back(currentRing + s);
+            indices.push_back(nextRing + next);
+            indices.push_back(currentRing + next);
+        }
+    }
+
+    // Bottom cap: Connect base ring (ring 0) to center bottom vertex
+    int centerIdx = slices * 3;
+    for (int s = 0; s < slices; s++) {
+        int next = (s + 1) % slices;
+        indices.push_back(centerIdx);
+        indices.push_back(next);
+        indices.push_back(s);
+    }
+
+    // Top cap: Connect top ring (ring 2) to center top vertex
+    int topCenterIdx = slices * 3 + 1;
+    int topRingStart = slices * 2;
+    for (int s = 0; s < slices; s++) {
+        int next = (s + 1) % slices;
+        indices.push_back(topCenterIdx);
+        indices.push_back(topRingStart + next);
+        indices.push_back(topRingStart + s);
+    }
+    
+    Mesh mesh = { 0 };
+    mesh.vertexCount = (int)vertices.size() / 3;
+    mesh.triangleCount = (int)indices.size() / 3;
+    mesh.vertices = (float*)RL_MALLOC(vertices.size() * sizeof(float));
+    mesh.indices = (unsigned short*)RL_MALLOC(indices.size() * sizeof(unsigned short));
+    
+    memcpy(mesh.vertices, vertices.data(), vertices.size() * sizeof(float));
+    memcpy(mesh.indices, indices.data(), indices.size() * sizeof(unsigned short));
+
+    // Allocate texcoords
+    mesh.texcoords = (float*)RL_MALLOC((size_t)mesh.vertexCount * 2 * sizeof(float));
+    for (int i = 0; i < mesh.vertexCount; ++i) {
+        mesh.texcoords[i * 2 + 0] = 0.0f;
+        mesh.texcoords[i * 2 + 1] = 0.0f;
+    }
+
+    // Use proven normal computation
+    MeshUtils::computeMeshNormals(&mesh);
+    
+    // Upload to GPU and validate
+    UploadMesh(&mesh, false);
+    mesh.vboId = 0;  // UploadMesh sets this; set explicitly to ensure
+    
+    MeshUtils::checkIsValid(mesh);
+    
+    return mesh;
 }
 
 Mesh createTorusMesh(float radius, float size, int radSeg, int sides) {

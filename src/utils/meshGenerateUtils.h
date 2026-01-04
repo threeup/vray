@@ -31,6 +31,9 @@ Mesh createCustomDodecahedron(float radius);
 Mesh createCustomPentagonalPrismSphere(float radius, int rings);
 
 // Extra / complex shapes (in meshExtraShapeUtils.cpp)
+Mesh createNormalishConeMesh(float baseRadius, float height, int slices, float asymmetryAmount);
+Mesh createAsymmetricConeMesh(float baseRadius, float height, int slices, float asymmetryAmount);
+Mesh createCraggyMountain(float baseRadius, float height, int slices);
 Mesh createTorusMesh(float radius, float size, int radSeg, int sides);
 Mesh createCapsuleMesh(float radius, float height, int rings, int slices);
 

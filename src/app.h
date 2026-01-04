@@ -48,6 +48,7 @@ struct UiState {
     bool fxaa = true;
     bool showEntities = true;
     bool showEnvironment = true;
+    bool showLightIndicator = true;
     bool bloomEnabled = true;
     float bloomIntensity = 1.0f;
     bool pastelEnabled = true;
