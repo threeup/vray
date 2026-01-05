@@ -18,7 +18,7 @@ struct DeckPanel {
 
 // Forward declaration
 struct Game;
-struct UiActions;
+struct CardActions;
 
 // Draw the deck panel at specified rectangle
-void DeckPanel_Draw(const Rectangle& deckRect, Game& game, UiActions& actions);
+void DeckPanel_Draw(const Rectangle& deckRect, Game& game, CardActions& actions);

@@ -2,99 +2,105 @@
 
 ## Executive Summary
 
-Readable C++ and a clear turn controller, but validation/ownership are weak and automation absent. New play subphases and logging add logic without tests. Hardcoded config and direct raylib use keep reliability modest.
+Readable C++ with clear turn controller and solid config system. Recent improvements include centralized Lua config with validation, platform abstraction interfaces, unique_ptr ownership, and a test suite with 9 test files. Direct raylib calls remain in render paths but are behind interfaces for platform systems.
 
-**Overall Grade: C**
+**Overall Grade: B-**
 
 ### Key Strengths
 
-- Core loops are short and readable; new phase/move logs aid debugging
-- Turn/plan logic is explicit; phased play substeps are easy to trace
-- Low algorithmic complexity; contained blast radius
+- Core loops are short and readable; phase/move logging aids debugging
+- Centralized config system ([src/config.cpp](src/config.cpp)) with Lua loading and validation
+- Platform abstraction via interfaces ([src/platform/](src/platform/)); unique_ptr ownership
+- Test suite with 9 files including smoke tests, config tests, boss play tests
 
 ### Critical Gaps
 
-- Sparse validation and error handling on inputs/resources
-- Implicit ownership (raw pointers) and missing RAII for graphics handles
-- No automated tests on render/input/turn paths
-- Hardcoded config/magic numbers and direct engine coupling
+- Graphics handles (shaders/models) still lack RAII wrappers
+- Sparse validation on turn/plan edge cases (retries, blocked moves)
+- Direct raylib calls in render.cpp not behind abstraction seam
+- Magic numbers persist in some areas (camera defaults in constants.h)
 
 ## 1. Code Correctness & Quality
 
 ### 1.1 Correctness & Logic
 
-- Happy-path turn flow works; edge cases (blocked moves, retries) untested.
-- Subphase retries rely on state mutations without guardrails.
+- Happy-path turn flow works; edge cases (blocked moves, retries) have basic tests.
+- Subphase retries now have state machine structure with clear transitions.
 
-**Grade: C+**
+**Grade: B-**
 
 ### 1.2 Validation & Error Paths
 
-- Minimal bounds/null checks; asset/config failures likely crash/hang.
-- Error propagation is ad-hoc; little user feedback.
+- Config has validation and clamping ([src/config.cpp#L53-L81](src/config.cpp#L53-L81))
+- Main loop wrapped in try-catch with crash logging ([src/main.cpp#L209-L230](src/main.cpp#L209-L230))
+- Error propagation improved but still ad-hoc in some areas
 
-**Grade: C-**
+**Grade: C+**
 
 **Validation Gaps**
 | Area | Input/Resource | Missing Checks | Severity | Fix Idea |
 | ---- | -------------- | -------------- | -------- | -------- |
-| Window init ([src/main.cpp](src/main.cpp)) | Width/height/FPS params | Bounds/config validation | Med | Load from config; clamp values |
-| Turn execution ([src/boss.cpp](src/boss.cpp)) | Pending lists/subphase retries | Empty/null plans, max retries | Med | Guard on empty plans; cap retries/log errors |
+| Turn execution ([src/boss/bossPlayState.cpp](src/boss/bossPlayState.cpp)) | Pending lists/subphase retries | Max retries guard | Low | Cap retries/log errors |
+| Asset loading ([src/render.cpp](src/render.cpp)) | Shader/model loads | Load failure handling | Med | Check validity + fallback |
 
 ### 1.3 Type Safety & Modern Practices
 
-- Raw pointers for `game`/`boss` ([src/app.h#L120](src/app.h#L120)); no RAII for shaders/models.
-- Const usage uneven; no `enum class` for EntityType.
+- unique_ptr for platform systems ([src/app.h#L114-L116](src/app.h#L114-L116))
+- State machine uses unique_ptr for state ownership ([src/common/statemachine.h](src/common/statemachine.h))
+- Game/boss passed as references (non-owning) to AppContext
+- Graphics handles (shaders/models) still need RAII wrappers
 
-**Grade: C-**
+**Grade: B-**
 
 **Ownership / Const Issues**
 | Symbol | Issue | Risk | Fix |
 | ------ | ----- | ---- | --- |
-| AppContext::game/boss | Raw pointers | Lifetime/UB | unique_ptr or ref with owner scope |
 | RenderShaders handles | Plain Shader {0} | Leak/misuse | RAII wrapper + validity checks |
-| UiState | Global mutable struct | Hard to reset/test | Provide reset ctor; narrow scope |
+| RenderModels handles | Plain Model {0} | Leak/misuse | RAII wrapper + validity checks |
+| UiState | Mutable struct in context | Hard to reset/test | Narrow scope or reset ctor |
 
 ### 1.4 Code Quality & Readability
 
-- Naming is clear; functions are short. Magic numbers persist (window size, FPS, camera FOV).
+- Naming is clear; functions are short.
+- Config centralized in [vars.lua](../vars.lua) and [src/config.cpp](src/config.cpp)
+- Some magic numbers persist in constants.h for camera defaults
 
-**Grade: C+**
+**Grade: B**
 
 **Magic Numbers Tally**
 | Location | Value | Meaning | Replace With |
 | -------- | ----- | ------- | ------------ |
-| [src/main.cpp](src/main.cpp) | 800, 600, 60, 45.0f | Window size/FPS/FOV | Config constants file |
-| [src/constants.h](src/constants.h) | Camera pitch/yaw/dist literals | Camera defaults | Central config |
+| [src/constants.h](src/constants.h) | Camera pitch/yaw/dist literals | Camera defaults | Use AppConfig defaults only |
 
 ### 1.5 Red Flags
 
-- Direct raylib calls everywhere; no seams for testing.
-- Subphase logic lacks tests and could mask blocked actions.
+- Direct raylib calls in render.cpp; input/window behind interfaces
+- Subphase logic now has tests but could use more edge case coverage
 
-**Grade: C-**
+**Grade: C+**
 
 ## 2. Issues Found
 
-| Category   | File                             | Lines | Issue                             | Sev  | Owner | ETA |
-| ---------- | -------------------------------- | ----- | --------------------------------- | ---- | ----- | --- |
-| Ownership  | [src/app.h#L120](src/app.h#L120) | 120   | Raw pointers for game/boss        | Med  | TBD   | P0  |
-| Validation | [src/boss.cpp](src/boss.cpp)     | -     | Subphase retries lack guard/limit | Med  | TBD   | P0  |
-| Config     | [src/main.cpp](src/main.cpp)     | -     | Hardcoded window/FPS/FOV          | Low  | TBD   | P1  |
-| Coverage   | Project                          | -     | No tests on render/input/turn     | High | TBD   | P0  |
+| Category    | File                                   | Lines | Issue                              | Sev | Owner | ETA |
+| ----------- | -------------------------------------- | ----- | ---------------------------------- | --- | ----- | --- |
+| RAII        | [src/app.h#L63-L90](src/app.h#L63-L90) | 63-90 | Shader/model handles lack RAII     | Med | TBD   | P1  |
+| Abstraction | [src/render.cpp](src/render.cpp)       | -     | Direct raylib calls in render path | Low | TBD   | P2  |
+| Coverage    | [tests/](tests/)                       | -     | Edge case coverage sparse          | Med | TBD   | P1  |
 
-**Grade: C-**
+**Grade: B-**
 
 ## 3. Testing & Tooling
 
-- No unit/integration/smoke tests; no sanitizers/CI visible.
-- Logging exists but is unstructured; no assertions/guards.
+- Test suite with 9 files: smoke tests, config tests, boss play tests, card logic, entity grid, etc.
+- Tests use GoogleTest framework ([tests/](tests/))
+- Smoke tests cover render loop, input polling, window resize, asset failure ([tests/smoke_tests.cpp](tests/smoke_tests.cpp))
+- No CI visible yet; sanitizers not configured
 
-**Grade: D+**
+**Grade: B-**
 
 ## 4. Summary & Recommendations
 
-- **Top 3 Fixes**: Add validation/guards in turn/play; replace raw pointers with owned refs/unique_ptr; centralize config constants.
-- **Safety/Robustness**: Add asserts/early returns; wrap shaders/models in RAII; structured logging for errors.
-- **Quality/Readability**: Extract config constants; document play subphase intent; keep functions small.
-- **Follow-up Tests**: Smoke tests for render/input/turn; unit tests for TurnPlan validation and boss subphase retries; regression for blocked-move retry.
+- **Top 3 Fixes**: Add RAII wrappers for shaders/models; expand edge case test coverage; add CI pipeline
+- **Safety/Robustness**: Asset load failure handling; structured logging with levels
+- **Quality/Readability**: Remove remaining magic numbers in constants.h; document state machine transitions
+- **Follow-up Tests**: Integration tests for full turn cycle; stress tests for blocked moves

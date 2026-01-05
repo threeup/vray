@@ -6,7 +6,7 @@
 #include "entity.h"
 #include "card.h"
 
-struct UiActions;
+struct CardActions;
 
 struct Game {
     Grid grid;
@@ -44,7 +44,7 @@ void update_game(Game& game, float dt);
 void handle_input(Game& game, const Platform& platform);
 
 // Handle actions triggered from the UI. Optional flag to suppress auto-resolve.
-void handle_ui_actions(Game& game, const UiActions& actions, bool allowResolve = true);
+void handle_ui_actions(Game& game, const CardActions& actions, bool allowResolve = true);
 
 // Execute a random AI turn for provided seed (uses enemy mech ids if present).
 void execute_ai_random_turn(Game& game, uint32_t seed, float mirrorChance = 0.5f);

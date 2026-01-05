@@ -1,149 +1,404 @@
-# Architecture — Vray Demo (Revised)
+# Architecture — Vray Demo
 
-This document outlines the architectural design for the Vray Demo project.
+This document describes the actual architecture of the Vray Demo project: a C++ card-sequence turn-based tactical game with deterministic grid-based combat.
 
 ## Overview
 
-- **Project**: A C++ card-sequence game where players (human, AI) submit ordered card sequences that execute deterministically on a grid-based world.
-- **Core Systems**:
-  - **Simulation**: Grid-based world (chessboard-like) for entity placement, movement, and interactions.
-  - **Card Engine**: Card definitions, sequence construction, ordering, and deterministic application of effects.
-- **Targets**:
-  - Desktop: `raylib` + `raygui`
-  - Web: Emscripten (WASM)
-- **Build System**: `CMake` for cross-platform builds and Emscripten integration.
-- **Rendering**:
-  - Procedural/vector meshes instead of bitmap sprites for scalability and lightweight web deployment.
-  - Side tangent kept: procedural tree/pyramid variants and auto-instanced placement; keep reusable but optional.
-- **Grid**:
-  - Recommended bounded 12×12 grid (configurable), serving as spatial substrate for positioning and area-of-effect resolution.
+**Vray** is a turn-based card game where:
+
+- **Players** (human + AI) assign cards to mechs during the **PlayerSelect phase**
+- **AI** builds its plan during **NpcSelect phase**
+- **Both plans execute simultaneously** during the **Play phase** with deterministic card effects on a grid-based world
+- **Rendering** uses Raylib with procedural meshes and a custom UI panel system
+
+**Tech Stack**:
+
+- C++20 (std::vector, std::unique_ptr, ranges)
+- Raylib 5.6 (graphics, input, windowing)
+- CMake (build system)
+- Deterministic simulation with pure card effect functions
 
 ---
 
-## Components
+## Core Systems
 
-### Game Model
+### 1. Game Simulation (`src/game.h/cpp`)
 
-- **Card**: ID, name, parameters (target, magnitude, duration, metadata).
-- **Sequence**: Ordered list of card references with execution metadata (owner, timestamp).
-- **GameState**: Entities, resources, turn/time, event queue.
+The `Game` struct owns:
 
-### Execution / Semantics
+- **Grid**: 12×12 spatial substrate for entity placement
+- **Entities**: Player mechs (IDs 1-3), enemy mechs (IDs 4-6), objects
+- **Hand**: Available cards for the player, usage tracking
+- **Deck**: Card pool for drawing (T_051)
+- **CurrentPlan**: Active card-to-mech assignments
+- **Turn Counter**: Track round progression
 
-- Playing a sequence applies each card’s effect to the game state in order.
-- Effects are pure functions: `(GameState, Card, Context) -> GameStateDelta` for deterministic replay and testing.
-- Concurrency: Each actor maintains its own sequence; main loop interleaves deltas for smooth visual updates.
+**Key Functions**:
 
-### Game Loop
-
-- Fixed-step loop (e.g., 60Hz): poll input, advance simulation, apply sequence steps, render.
-- Headless mode for unit tests and deterministic validation.
-
-### UI & Rendering
-
-- `raylib`: rendering + input.
-- `raygui`: immediate-mode GUI for card hand, sequence editor, play controls.
-- UI issues commands to the model; model owns state.
-- Procedural mesh utilities: `MeshGenerator` hosts cube/octa canopy trees, cubic stars, pyramids; keep parameterized for reuse.
-- Instancing helper: simple grid scatter with spacing ≥2 units to place demo entities without manual coordinates.
-
-### Build & Export
-
-- `CMake` for native and web builds.
-- Native: link against raylib.
-- Web: Emscripten → WASM + HTML shell.
+- `begin_turn()`: Reset hand usage flags for new turn
+- `init_game()`: Seed initial player/enemy/object placement
+- `update_game()`: Per-frame simulation (rotations, etc.)
+- `handle_ui_actions()`: Process UI intents without auto-resolve
+- `handle_input()`: Process keyboard/mouse input
 
 ---
 
-## Proposed File/Layout Refactor
+### 2. Turn Phase Manager (`src/boss.h/cpp`)
 
-Goal: Move subsystems out of `main.cpp` into focused modules for composability.
+The `Boss` class orchestrates the three-phase turn cycle:
 
-- **src/app.h/.cpp**
+```
+PlayerSelect → NpcSelect → Play → PlayerSelect (repeat)
+```
 
-  - `AppContext` struct: window, camera, render targets, shaders, models, game, UI state.
-  - `init_app`, `shutdown_app`, `rebuild_render_targets`.
+**Phases**:
 
-- **src/render.h/.cpp**
+- **Phase::PlayerSelect** (0):
 
-  - `load_shaders`, `load_models`.
-  - `render_scene`, `post_process`.
+  - Player assigns cards to mechs via card UI drag-drop
+  - Player clicks OK to lock their plan
+  - UI shows: phase bar, deck panel, game board, mech slots, hand
 
-- **src/ui.h/.cpp**
+- **Phase::NpcSelect** (1):
 
-  - Panels for card/sequence editing and render controls.
+  - Boss generates random NPC plan (via `buildNpcPlan()`)
+  - No player input allowed
+  - UI shows: only phase bar and hand (other panels hidden)
 
-- **src/game.h/.cpp**
+- **Phase::Play** (2):
+  - Both player and NPC plans execute simultaneously
+  - Cards apply effects to entities (movement, damage, heal)
+  - Effects resolved subphase-by-subphase
+  - UI shows: only phase bar and hand
 
-  - `Game` struct: grid, entities, sequences, hand, rotations.
-  - `init_game`, `update_game`.
+**State Management**:
 
-- **src/resources.h/.cpp**
+- `playerPlan_`: Locked plan from PlayerSelect
+- `npcPlan_`: Generated plan during NpcSelect
+- `pendingPlayer_`, `pendingNpc_`: Cards to execute
+- `playSubphase_`: Current execution slot
 
-  - Helpers for meshes/models/shaders/targets with RAII cleanup.
+---
 
-- **src/constants.h**
+### 3. Card System (`src/card.h/cpp`)
 
-  - Tunables: window size, grid cell height, AA defaults, palette, radii, speeds.
+**Card Types**:
 
-- **src/main.cpp**
-  - Thin orchestration: init, loop, shutdown.
+- `CardType::Move`: Directional movement (forward/lateral)
+- `CardType::Damage`: Direct damage to target
+- `CardType::Heal`: Health restoration
+
+**Plan Structure**:
+
+```cpp
+struct PlanAssignment {
+    int mechId;        // Target mech ID
+    int cardId;        // Card ID
+    bool useMirror;    // Mirror direction flag
+};
+
+struct TurnPlan {
+    std::vector<PlanAssignment> assignments;
+    bool validate(...);  // Verify plan is legal
+};
+```
+
+**Card Execution**:
+
+- Pure functions: `(GameState, Card, Context) → GameStateDelta`
+- `applyCard()`: Apply single card effect
+- Deterministic: same seed + same plan = same result
+
+---
+
+### 4. UI System (`src/ui/cardui/`)
+
+**New Card UI System** (T_050-T_059):
+
+**Layout** (`GameUIPanel`):
+
+```
+┌─────────────────────────────────────┐  ← Phase Bar (20px, always visible)
+├──────────────┬──────────────────────┤
+│   Deck       │    Game Board        │  ← Top Row (48px, PlayerSelect only)
+│ (50% width)  │    (50% width)       │
+├──────────────────────────────────────┤
+│        Mech Slot Container           │  ← Mech Row (160px, PlayerSelect only)
+│   [Mech 1]  [Mech 2]  [Mech 3] [OK] │    - 3 mech circles (80px)
+│   [Slot 1]  [Slot 2]  [Slot 3]      │    - 3 card slots (120×160px)
+│                              (40px)  │    - OK button (40×160px, right edge)
+├──────────────────────────────────────┤
+│           Hand Panel                 │  ← Hand (120px, always visible)
+│  [Draggable Cards]                   │
+└──────────────────────────────────────┘
+```
+
+**Components**:
+
+- **GameUIPanel** (`game_ui_panel.h`):
+
+  - Root layout container managing 5 panels
+  - `computeLayout()`: Calculate positions based on window size
+  - `showMechRow`: Visibility flag (hidden after OK or during non-PlayerSelect)
+
+- **DeckPanel** (`deck_panel.h`):
+
+  - Shows remaining deck count
+  - Draw button to add cards to hand
+
+- **HandPanel** (`hand_panel.cpp`):
+
+  - Displays draggable cards with color coding by type
+  - Handles card hover/selection state
+  - Shows card tooltips on hover
+
+- **MechSlotContainer** (`mech_slot_container.cpp`):
+
+  - 3 mech circles (Alpha=red, Bravo=blue, Charlie=green)
+  - 3 card drop zones (accept dragged cards)
+  - Hover highlight (yellow outline) on valid drop target
+  - Mech stat display (HP, bonuses)
+  - **OK button** (right edge): validates plan, triggers phase advance
+
+- **GameBoardPanel** (`game_board_panel.cpp`):
+  - Placeholder for future combat visualization
+  - Shows team/enemy status
+
+**Drag-Drop Mechanics** (T_054):
+
+- Rectangle-based collision detection (100×140px card bounding box)
+- `CheckCollisionRecs()`: Detect card-to-slot overlap
+- Hover state updates `drag.hoverSlotIndex`
+- Release: `update_cardui_drop()` validates and assigns card or bounces it back
+
+**Card Removal**:
+
+- Red X button on each mech slot removes assigned card
+- Card returned to hand via `game.hand.unmarkUsed()`
+
+---
+
+### 5. Entity & Grid System (`src/entity.h`, `src/grid.h`)
+
+**Entity**:
+
+```cpp
+struct Entity {
+    int id;
+    Vector2 position;
+    EntityType type;  // PLAYER, ENEMY, OBJECT
+    float health;
+};
+```
+
+**Grid**:
+
+- 12×12 grid (configurable)
+- `getOccupant()`: Check occupancy
+- Movement collision detection
+- Entity placement validation
+
+---
+
+## Data Flow
+
+### Turn Execution Sequence
+
+```
+Main Loop (main.cpp)
+  ↓
+[Phase 0: PlayerSelect]
+  draw_cardui()              ← Render phase bar, deck, board, mech slots, hand
+  update_cardui_drop()       ← Check card releases, validate & assign
+  HandPanel_UpdateDrag()     ← Clear drag state
+  boss.processUi()           ← Check if actions.playSequence set
+    if valid plan → boss.enterPhase(NpcSelect)
+  ↓
+[Phase 1: NpcSelect]
+  boss.update()              ← Time-based phase transitions
+    buildNpcPlan()           ← Random mech-card assignments
+    validatePlan()
+    enterPhase(Play)
+  ↓
+[Phase 2: Play]
+  boss.update()              ← Subphase-based execution
+    runPlaySubphase()        ← Apply assignments in order
+      applyAssignment()
+        applyCard()          ← Movement, damage, heal effects
+      SyncWorldActorsFromGame()  ← Update 3D world
+    when all subphases done → finishRound() → enterPhase(PlayerSelect)
+  ↓
+[Loop back to Phase 0]
+```
+
+---
+
+## File Organization
+
+```
+src/
+├── main.cpp                 ← Main loop orchestrator
+├── app.h/cpp                ← AppContext, platform initialization
+├── boss.h/cpp               ← Phase manager (PlayerSelect/NpcSelect/Play)
+├── game.h/cpp               ← Game state, turn management
+├── card.h/cpp               ← Card definitions, effects
+├── entity.h                 ← Entity struct
+├── grid.h/cpp               ← Grid spatial queries
+├── ui.h/cpp                 ← UiActions, MechStats structs
+│
+├── ui/cardui/               ← NEW Card UI System (T_050-T_059)
+│   ├── cardui.h/cpp         ← Main orchestrator
+│   ├── game_ui_panel.h      ← Layout container
+│   ├── deck_panel.h         ← Deck display
+│   ├── hand_panel.h/cpp     ← Hand display, draggable cards
+│   ├── game_board_panel.h/cpp
+│   └── mech_slot_container.h/cpp  ← Mech circles, card slots, OK button
+│
+├── platform/                ← Platform abstraction (raylib backend)
+│   ├── platform.h/cpp
+│   ├── raylib_window.h/cpp
+│   ├── raylib_input.h/cpp
+│   ├── raylib_renderer.h/cpp
+│   └── renderer_interface.h
+│
+├── world/                   ← 3D world simulation
+│   └── world.h/cpp
+│
+└── utils/                   ← Helper utilities
+    ├── meshGenerateUtils.h/cpp
+    ├── meshMech.h/cpp
+    ├── luaUtils.h/cpp
+    └── ...
+```
+
+---
+
+## Key Design Decisions
+
+### 1. **Deterministic Simulation**
+
+Card effects are pure functions:
+
+```cpp
+GameState after = applyCard(before, card, mechId, useMirror);
+```
 
 **Benefits**:
 
-- Clear separation of concerns.
-- Centralized GPU resource management.
-- Easier AA/post-effect experimentation without touching simulation.
+- Replay-able: same seed + same plan = same result
+- Testable: unit tests validate effects
+- Network-ready: send plans, not full state
+
+### 2. **Phase-Based Turn System**
+
+Explicit phases (PlayerSelect → NpcSelect → Play) provide:
+
+- **UI Clarity**: Player knows what's happening
+- **Determinism**: Clear execution order
+- **Timing**: Time-based transitions (not input-driven)
+
+### 3. **Immutable Layout**
+
+`GameUIPanel` layout is computed fresh each frame:
+
+- Responsive to window resize
+- Panels scale intelligently
+- No state mutation in rendering
+
+### 4. **Drag-Drop via Collision**
+
+Rectangle-to-rectangle collision detection (not point-to-point):
+
+- Tolerant to slight misses
+- Natural "hover" feedback (yellow outline)
+- Card snaps to slot on release
 
 ---
 
-# Suggested Architectural Improvements
+## UI Action Flow
 
-Your current design is solid for a raylib demo, but here are stronger architectural bases to consider:
-
-### 1. **Entity-Component-System (ECS) Core**
-
-- Replace monolithic `Game` struct with ECS.
-- Entities = IDs; Components = data (position, health, sequence queue); Systems = logic (movement, card effects).
-- Benefits: scalability, modularity, easier AI and multiplayer extension.
-
-### 2. **Functional Core, Imperative Shell**
-
-- Keep game logic pure (functional transformations of state).
-- Wrap with imperative shell for rendering, input, and side effects.
-- Benefits: deterministic replay, easier testing, clean separation.
-
-### 3. **Shader-Based Grid Rendering**
-
-- Instead of geometry lines, render grid via distance-field shader.
-- Benefits: crisp anti-aliased lines, resolution independence, simpler pipeline.
-
-### 4. **Layered Rendering Pipeline**
-
-- Separate passes: world → entities → effects → UI.
-- Post-process AA (FXAA/SMAA) layered after scene render.
-- Benefits: flexible visual stack, easier experimentation with effects.
-
-### 5. **Cross-Platform Abstraction Layer**
-
-- Abstract rendering/input so raylib is a backend, not a dependency.
-- Benefits: easier to swap in SDL, WebGPU, or native APIs later.
-
-**Decision**: This approach is being implemented. Tasks `T041`-`T043` in `tasks.md` define the work to create this abstraction layer, with an initial backend implementation using `raylib`.
-
-### 6. **Simulation Harness**
-
-- Build a headless simulation runner for CI/testing.
-- Benefits: reproducible game state validation, automated regression tests.
-
-### Procedural Assets as Optional Layer
-
-- Treat procedural mesh generation and instanced placement as an optional library layer: reusable for demos/tests, but isolated from core simulation. Document defaults and keep them behind a thin API so they do not leak into game logic.
+```
+User Input
+  ↓
+draw_cardui()              ← Renders UI, captures clicks
+  ├─ draw_phase_indicator()
+  ├─ DeckPanel_Draw()      ← Draw button checks mouseClick
+  ├─ HandPanel_Draw()      ← Card hover/drag initiation
+  ├─ MechSlotContainer_Draw()
+  │   └─ OK button check → sets actions.playSequence
+  └─ GameBoardPanel_Draw()
+  ↓
+update_cardui_drop()       ← Process card releases
+  ├─ Check collision (drag rect vs slot rects)
+  ├─ Validate assignment
+  └─ Update game.currentPlan
+  ↓
+HandPanel_UpdateDrag()     ← Update drag state, clear on release
+  ↓
+boss.processUi(actions)    ← Check actions.playSequence
+  └─ If valid plan → enter NpcSelect phase
+```
 
 ---
 
-## Summary & Next Steps
+## State Management
 
-The immediate focus is on completing the platform abstraction layer (`T041`-`T043`) and implementing core simulation features.
+**Mutable State**:
 
-For future scalability, the project will evolve from the monolithic `Game` struct towards an **Entity-Component-System (ECS)** architecture. This will provide a more flexible and performant foundation for handling complex game logic, AI, and potentially multiplayer features.
+- `Game::currentPlan` - Active card assignments
+- `Game::hand` - Card usage flags
+- `Boss::phase_` - Current phase
+- `DragState` - Drag-drop tracking
+- `GameUIPanel::showMechRow` - Mech row visibility
+
+**Immutable/Pure**:
+
+- Card effects (applyCard)
+- Plan validation
+- Entity updates (new GameState returned, old not modified)
+
+---
+
+## Testing & Validation
+
+**Unit Tests** (`tests/`):
+
+- Card logic tests (T_063: card_logic_tests.cpp)
+- Plan validation
+- Grid collision
+- Mech stat calculations (T_057)
+
+**Smoke Tests**:
+
+- Full turn cycle execution
+- Phase transitions
+- UI rendering (regression visual tests)
+
+---
+
+## Future Extensions
+
+### Planned (T_060-T_066)
+
+- **Animations**: Card play/assignment feedback, card movement on grid
+- **Visual Polish**: Particle effects, sound cues, screen shake
+- **Testing**: Full game state validation tests
+
+### Potential
+
+- **ECS Migration**: Move to Entity-Component-System for complex entities
+- **Networking**: Send plans to server, receive opponent's plan
+- **AI Difficulty**: Parameterized NPC strategy
+- **Procedural Generation**: Map/card pool generation
+
+---
+
+## Performance Considerations
+
+- **Grid Queries**: O(1) occupancy check via hash
+- **Card Effects**: Instant (no animation) for determinism
+- **Rendering**:
+  - Procedural meshes cached
+  - Raylib batching handles many entities
+  - FXAA post-process on render target
+- **Dragging**: Per-frame collision vs 3 slots (negligible cost)

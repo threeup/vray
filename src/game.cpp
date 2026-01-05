@@ -144,7 +144,7 @@ void handle_input(Game& game, const Platform& platform) {
     }
 }
 
-void handle_ui_actions(Game& game, const UiActions& actions, bool allowResolve) {
+void handle_ui_actions(Game& game, const CardActions& actions, bool allowResolve) {
     // Step 1: select a card (no assignment yet)
     if (actions.selectCardId != -1) {
         const Card* cardPtr = nullptr;

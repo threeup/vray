@@ -38,12 +38,12 @@ struct MechSlotContainer {
 // Forward declarations
 struct Game;
 struct DragState;
-struct UiActions;
+struct CardActions;
 
 // Draw the mech slot container with 3 mech+card pairs
 struct GameUIPanel;  // Forward declaration
 
-void MechSlotContainer_Draw(const Rectangle& slotRect, Game& game, DragState& drag, UiActions& actions, GameUIPanel& layout);
+void MechSlotContainer_Draw(const Rectangle& slotRect, Game& game, DragState& drag, CardActions& actions, GameUIPanel& layout);
 
 // Check if a point is over a card slot (for drop zone detection)
 int MechSlotContainer_GetDropSlotIndex(const MechSlotContainer& container, const Rectangle& slotRect, int x, int y);

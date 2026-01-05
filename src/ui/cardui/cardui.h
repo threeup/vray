@@ -4,7 +4,7 @@
 
 // Forward declarations
 struct Game;
-struct UiActions;
+struct CardActions;
 struct DragState;
 struct CardTooltip;
 
@@ -15,7 +15,7 @@ struct CardTooltip;
  */
 
 // Draw the complete card UI layout using GameUIPanel
-void draw_cardui(GameUIPanel& layout, int currentPhase, int winW, int winH, Game& game, UiActions& actions, DragState& drag, CardTooltip& tooltip);
+void draw_cardui(GameUIPanel& layout, int currentPhase, int winW, int winH, Game& game, CardActions& actions, DragState& drag, CardTooltip& tooltip);
 
 // Update card placements based on drag-drop (T_054)
-void update_cardui_drop(Game& game, UiActions& actions, DragState& drag);
+void update_cardui_drop(Game& game, CardActions& actions, DragState& drag);

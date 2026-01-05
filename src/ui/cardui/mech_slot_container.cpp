@@ -60,7 +60,7 @@ Color getMechVariantColor(MechVariant variant) {
     }
 }
 
-void MechSlotContainer_Draw(const Rectangle& slotRect, Game& game, DragState& drag, UiActions& actions, GameUIPanel& layout) {
+void MechSlotContainer_Draw(const Rectangle& slotRect, Game& game, DragState& drag, CardActions& actions, GameUIPanel& layout) {
     // Create and compute layout
     MechSlotContainer container;
     container.computeLayout(slotRect);

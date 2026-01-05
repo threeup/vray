@@ -2,23 +2,23 @@
 
 ## Executive Summary
 
-Playable demo with responsive card/turn loop and recent phase/move logging, but product readiness is blocked by absent persistence, onboarding, and error surfacing; coverage is still zero.
+Playable demo with responsive card/turn loop, improved error handling with try-catch and crash logging, and test suite for stability. UI implementation largely complete (T_050-T_059). Main gaps remain: no settings/save persistence, no onboarding/help screens.
 
-**Overall Grade: C+**
+**Overall Grade: B-**
 
 ### Key Strengths
 
-- Core loop (card → mech assignment → phased play) is responsive and readable
-- New logging for boss phases and mech moves helps diagnostics
-- UI density improved (collapsible panels, plan/assign flow) and usable
-- Scope is tight; defects are constrained
+- Core loop (card → mech assignment → phased play) is responsive and polished
+- UI card system fully implemented with drag-drop, tooltips, mech slots
+- Error handling with try-catch in main loop and crash logging to file
+- Test suite with smoke tests validating render/input stability
 
 ### Critical Gaps
 
 - No settings/save persistence; sessions are ephemeral
 - No onboarding/help; controls and flow are implicit
-- Error handling/surfacing is minimal; failures likely silent
-- No automated coverage on critical loops (render/input/turn)
+- No input remapping or accessibility options
+- Performance profiling hooks absent
 
 ## 1. Feature Completeness
 
@@ -26,78 +26,81 @@ Playable demo with responsive card/turn loop and recent phase/move logging, but 
 
 **Status Matrix**
 
-| Feature                   | Status  | Notes                                  | Risk |
-| ------------------------- | ------- | -------------------------------------- | ---- |
-| Card/turn loop            | Done    | Player/NPC plans, phased play substeps | Med  |
-| UI/menus                  | Partial | Core HUD only; minimal settings/help   | Med  |
-| Persistence (config/save) | Missing | No config/save/load                    | High |
-| Onboarding/help           | Missing | No tutorial or controls reference      | High |
-| Error feedback            | Missing | Silent/console-only errors             | High |
+| Feature                   | Status  | Notes                                      | Risk |
+| ------------------------- | ------- | ------------------------------------------ | ---- |
+| Card/turn loop            | Done    | Player/NPC plans, phased play substeps     | Low  |
+| Card UI (T_050-T_059)     | Done    | Drag-drop, tooltips, mech slots, mirror    | Low  |
+| UI/menus                  | Partial | Core HUD complete; minimal settings/help   | Med  |
+| Persistence (config/save) | Partial | Config loads from Lua; no save/load game   | Med  |
+| Onboarding/help           | Missing | No tutorial or controls reference          | Med  |
+| Error feedback            | Partial | Crash logged; limited user-facing feedback | Med  |
 
-- Happy path runs; advanced flows (settings, saves) absent.
-- Content depth is demo-only; replayability limited.
+- Happy path runs well with polished UI
+- Config persistence works; game state persistence missing
 
-**Grade: C**
+**Grade: B-**
 
 ### 1.2 Feature Parity vs Vision
 
-- Behind on saves/settings/help; scope cuts not surfaced to users.
+- Core gameplay matches vision; UI implementation complete
+- Saves/persistence and onboarding deferred
 
-**Grade: C**
+**Grade: B-**
 
 ## 2. User Experience & Input
 
 ### 2.1 Gameplay Input & Controls
 
-- Latency is low; camera/control defaults acceptable.
-- No remapping or accessibility toggles; keyboard-only experience.
+- Latency is low; camera/control config via Lua file
+- Drag-drop card interaction feels responsive
+- No remapping or accessibility toggles yet
 
-**Grade: C+**
+**Grade: B**
 
 ### 2.2 UX Flow & Friction
 
-- Assignment flow is clearer (card selection + mech targets), but no onboarding.
-- Plan panel collapses in non-player phases; feedback limited.
-- No loading/error affordances; minimal polish cues.
+- Card UI flow polished (selection + mech targets + tooltips)
+- Plan panel behavior clear; feedback present
+- No loading/error affordances for users
 
-**Grade: C**
+**Grade: B-**
 
 ### 2.3 Adoption Blockers
 
-- Missing help/onboarding and persistence; silent failures likely.
+- Missing onboarding and game persistence
+- No input remap for accessibility
 
-**Grade: C-**
+**Grade: C+**
 
 **Adoption Blockers**
 | Blocker | Impact | Severity (C/H/M/L) | Owner | ETA |
 | ------- | ------ | ------------------ | ----- | --- |
-| No settings/persistence | Users lose prefs each run | High | TBD | P1 |
-| Missing help/onboarding | Users guess controls/flow | High | TBD | P1 |
-| Silent error handling | Crashes/hangs without UI | High | TBD | P0 |
-| No automated tests | Regression risk | Med | TBD | P0 |
+| No game persistence | Users lose progress each run | Med | TBD | P1 |
+| Missing help/onboarding | Users guess controls/flow | Med | TBD | P1 |
 | No input remap/a11y | Blocks some users | Med | TBD | P2 |
 
 ## 3. Error Handling & Robustness
 
 ### 3.1 Detection & Validation
 
-- Limited validation; missing asset/config handling unclear.
-- Errors mostly fall through to crashes or silent fails.
+- Config validation with clamping ([src/config.cpp](src/config.cpp))
+- Main loop wrapped in try-catch with crash logging
 
-**Grade: D+**
+**Grade: B-**
 
 ### 3.2 Failure Modes & Recovery
 
-- No recovery paths; failures end the session.
-- No user-facing error messaging.
+- Crash logged to file; app exits gracefully on error
+- User-facing error messaging still limited
 
-**Grade: D**
+**Grade: C+**
 
 ### 3.3 Observability
 
-- New phase/move logs exist, but no structured logging/crash capture.
+- TraceLog for phases/moves; crash logging to app_crashes.log
+- No structured logging levels
 
-**Grade: D+**
+**Grade: C+**
 
 ## 4. Test Coverage & Risk
 
@@ -105,55 +108,62 @@ Playable demo with responsive card/turn loop and recent phase/move logging, but 
 
 | Component/Feature | Coverage    | Risk If It Breaks | Severity | Priority |
 | ----------------- | ----------- | ----------------- | -------- | -------- |
-| Render/input loop | Manual only | High              | High     | High     |
-| Turn planner/play | Manual only | High              | High     | High     |
-| UI flows          | None        | Med               | Med      | Med      |
-| Error paths       | None        | High              | High     | High     |
+| Render/input loop | Smoke tests | High              | High     | Done     |
+| Turn planner/play | Unit tests  | High              | High     | Done     |
+| Config loading    | Unit tests  | Med               | Med      | Done     |
+| UI flows          | Manual      | Med               | Med      | P2       |
+| Edge paths        | Partial     | Med               | Med      | P1       |
 
-**Grade: D**
+**Grade: B-**
 
 ### 4.2 Test Quality & Depth
 
-- No automated tests or fakes; regressions are likely.
+- GoogleTest framework with 9 test files
+- Smoke tests, config tests, boss play tests, card logic tests
+- Tests can run in headless/hidden window mode
 
-**Grade: D**
+**Grade: B**
 
 ### 4.3 Risk Hotspots
 
-- Turn/phase controller, render/input loop, asset loading.
+- Turn/phase controller (tested), render loop (smoke tested)
+- Asset loading edge cases less covered
 
-**Grade: D+**
+**Grade: B-**
 
 ## 5. Stability & Reliability
 
 ### 5.1 Runtime Stability
 
-- Stable in happy path; edge failures likely crash/hang.
+- Stable in happy path; errors caught and logged
+- Test suite validates basic stability
 
-**Grade: C**
+**Grade: B**
 
 ### 5.2 Data Integrity & Persistence
 
-- No persistence; settings lost; low integrity risk only because feature absent.
+- Config persistence works (Lua file)
+- Game state persistence not implemented
 
-**Grade: C-**
+**Grade: C+**
 
 ### 5.3 Performance Observations
 
-| Scenario           | Symptom                   | Suspected Cause      | Severity | Repro Steps      |
-| ------------------ | ------------------------- | -------------------- | -------- | ---------------- |
-| Startup load       | Brief pause on asset init | Synchronous loads    | Med      | Launch app       |
-| Rapid camera/input | Possible frame drops      | No culling/profiling | Med      | Pan/zoom rapidly |
+| Scenario           | Symptom                   | Suspected Cause     | Severity | Repro Steps      |
+| ------------------ | ------------------------- | ------------------- | -------- | ---------------- |
+| Startup load       | Brief pause on asset init | Synchronous loads   | Low      | Launch app       |
+| Rapid camera/input | Smooth                    | Good frame handling | N/A      | Pan/zoom rapidly |
 
 ## 6. Product Readiness
 
 ### 6.1 Readiness & Risk
 
-- Product-ready: Needs work; blockers are persistence, onboarding, error UI, tests.
+- Demo-ready with polished core loop
+- Blockers for production: game persistence, onboarding, accessibility
 
-**Grade: C-**
+**Grade: B-**
 
 ### 6.2 Summary
 
-- Works: Core loop responsiveness, simple HUD, new logging.
-- Fix: Error surfacing, persistence/settings, onboarding/help, automated smoke tests, input remap/a11y.
+- Works: Core loop, card UI, error handling, test coverage
+- Fix: Game persistence, onboarding/help, accessibility, structured logging

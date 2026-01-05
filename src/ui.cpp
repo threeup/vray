@@ -1,7 +1,7 @@
 #include "ui.h"
 #include "app.h"
 #include "game.h"
-#include "boss.h"
+#include "boss/boss.h"
 #include "raygui.h"
 #include <string>
 #include <algorithm>
@@ -92,8 +92,8 @@ void CardTooltip_Draw(CardTooltip& tooltip, const Game& game) {
     }
 }
 
-UiActions UI_Draw(AppContext& ctx) {
-    UiActions actions;
+CardActions UI_Draw(AppContext& ctx) {
+    CardActions actions;
     int winW = ctx.window->GetWidth();
     int winH = ctx.window->GetHeight();
 
@@ -103,18 +103,21 @@ UiActions UI_Draw(AppContext& ctx) {
     DrawRectangleRec(phaseRect, Color{240, 240, 240, 255});
     DrawRectangleLinesEx(phaseRect, 1, DARKGRAY);
 
-    Boss::Phase phase = Boss::Phase::PlayerSelect;
-    phase = ctx.boss.getPhase();
+    // Map state name to phase for UI display
+    const char* stateName = ctx.boss.getCurrentStateName();
+    int phaseIndex = 0;  // Default to PlayerSelect
+    if (stateName) {
+        if (strstr(stateName, "CardSelect")) phaseIndex = 0;  // PlayerSelect
+        else if (strstr(stateName, "NpcSelect")) phaseIndex = 1;  // NpcSelect
+        else if (strstr(stateName, "Play")) phaseIndex = 2;  // Play
+    }
 
     const char* labels[3] = {"User selects cards", "NPC selects cards", "Play phase"};
     for (int i = 0; i < 3; ++i) {
         float slotW = (phaseRect.width - 40.0f) / 3.0f;
         float cx = phaseRect.x + 20.0f + slotW * i + slotW * 0.1f;
         float cy = phaseRect.y + phaseRect.height * 0.5f;
-        bool active = false;
-        if (phase == Boss::Phase::PlayerSelect && i == 0) active = true;
-        if (phase == Boss::Phase::NpcSelect && i == 1) active = true;
-        if (phase == Boss::Phase::Play && i == 2) active = true;
+        bool active = (phaseIndex == i);
         Color outline = DARKGRAY;
         DrawCircleLines((int)cx, (int)cy, 8.0f, outline);
         if (active) {
@@ -124,7 +127,7 @@ UiActions UI_Draw(AppContext& ctx) {
     }
 
     // --- Card Hand & Sequence Panel (Top) ---
-    bool cardPanelCollapsed = (phase != Boss::Phase::PlayerSelect);
+    bool cardPanelCollapsed = (phaseIndex != 0);  // Collapsed except during PlayerSelect
     const float panelHeightExpanded = 260.0f;
     const float panelHeightCollapsed = 52.0f;
     float cardPanelHeight = cardPanelCollapsed ? panelHeightCollapsed : panelHeightExpanded;

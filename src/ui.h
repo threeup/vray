@@ -48,7 +48,7 @@ struct CardTooltip {
     float hoverTime = 0.0f;
 };
 
-struct UiActions {
+struct CardActions {
     bool playSequence = false;
     bool clearSequence = false;
     bool mirrorNext = false;
@@ -64,7 +64,7 @@ struct UiActions {
 };
 
 // Draw card/sequence panel; returns user intents (play/clear).
-UiActions draw_card_ui(Game& game, float panelWidth);
+CardActions draw_card_ui(Game& game, float panelWidth);
 
 // T_057: Calculate mech stats based on assigned cards
 MechStats calculateMechStats(int mechId, const Game& game);
@@ -76,5 +76,5 @@ void CardTooltip_Draw(CardTooltip& tooltip, const Game& game);
 void draw_render_controls(UiState& ui, int screenWidth, int screenHeight);
 
 // Draw the entire UI and return any user actions.
-UiActions UI_Draw(AppContext& ctx);
+CardActions UI_Draw(AppContext& ctx);
 

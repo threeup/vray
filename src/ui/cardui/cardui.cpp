@@ -36,7 +36,7 @@ void draw_phase_indicator(const Rectangle& phaseRect, int currentPhase) {
 }
 
 // T_051: DeckPanel implementation
-void DeckPanel_Draw(const Rectangle& deckRect, Game& game, UiActions& actions) {
+void DeckPanel_Draw(const Rectangle& deckRect, Game& game, CardActions& actions) {
     // Draw panel background
     DrawRectangleRec(deckRect, Color{60, 60, 70, 200});
     DrawRectangleLinesEx(deckRect, 2, LIGHTGRAY);
@@ -108,7 +108,7 @@ void draw_hand_panel(const Rectangle& handRect) {
 }
 
 // Main UI drawing function using GameUIPanel layout
-void draw_cardui(GameUIPanel& layout, int currentPhase, int winW, int winH, Game& game, UiActions& actions, DragState& drag, CardTooltip& tooltip) {
+void draw_cardui(GameUIPanel& layout, int currentPhase, int winW, int winH, Game& game, CardActions& actions, DragState& drag, CardTooltip& tooltip) {
     // Recompute layout in case window was resized
     layout.computeLayout(winW, winH);
     
@@ -138,7 +138,7 @@ void draw_cardui(GameUIPanel& layout, int currentPhase, int winW, int winH, Game
 }
 
 // T_054: Handle drag-drop logic
-void update_cardui_drop(Game& game, UiActions& actions, DragState& drag) {
+void update_cardui_drop(Game& game, CardActions& actions, DragState& drag) {
     // If mouse was released while dragging
     if (drag.isDragging && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         // Find the card being dragged for logging

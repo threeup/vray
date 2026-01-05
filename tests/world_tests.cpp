@@ -5,7 +5,7 @@
 #include "app.h"
 #include "platform/platform.h"
 #include "game.h"
-#include "boss.h"
+#include "boss/boss.h"
 #include <array>
 
 // Mock AppContext for testing (minimal)

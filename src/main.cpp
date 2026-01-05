@@ -11,7 +11,7 @@
 #include "ui/cardui/cardui.h"
 #include "ui/cardui/hand_panel.h"
 #include "world/world.h"
-#include "boss.h"
+#include "boss/boss.h"
 #include "config.h"
 #include <cmath>
 #include <algorithm>
@@ -159,15 +159,19 @@ int main() {
                 updateCameraWithConfig(ctx.camera, config);
                 update_game(game, dt);
                 World_Update(world, totalElapsedTime);
-
-                boss.update(game, dt);
-
                 handle_input(game, platform);
                 SyncWorldActorsFromGame(game, world);
 
-                // Update render scale if toggles changed
+                // Prepare card UI panel (drawn later in draw phase)
+                GameUIPanel uiLayout;
+                uiLayout.metrics = PanelMetrics{10.0f, 12.0f, 4.0f};
+                CardActions cardUiActions;
+
+                // Window size for UI/layout
                 int winW = platform.window->GetWidth();
                 int winH = platform.window->GetHeight();
+
+                // Update render scale if toggles changed
                 float targetScale = ctx.ui.supersample2x ? 2.0f : 1.0f;
                 if (fabsf(targetScale - ctx.targets.scale) > 0.01f || winW != ctx.targets.width || winH != ctx.targets.height) {
                     ctx.targets.scale = targetScale;
@@ -178,24 +182,29 @@ int main() {
                 platform.window->BeginFrame();
                 Render_DrawFrame(ctx, world);
 
-                // NEW: Card UI System (T_050-T_059)
-                GameUIPanel uiLayout;
-                uiLayout.metrics = PanelMetrics{10.0f, 12.0f, 4.0f};
-                int currentPhase = static_cast<int>(boss.getPhase());
-                UiActions cardUiActions;
+                // Determine phase for card UI rendering based on current state
+                const char* stateName = boss.getCurrentStateName();
+                int currentPhase = 0;  // Default to PlayerSelect
+                if (stateName) {
+                    if (strstr(stateName, "CardSelect")) currentPhase = 0;
+                    else if (strstr(stateName, "NpcSelect")) currentPhase = 1;
+                    else if (strstr(stateName, "Play")) currentPhase = 2;
+                }
+
+                // Draw card UI and collect actions
                 draw_cardui(uiLayout, currentPhase, winW, winH, game, cardUiActions, dragState, cardTooltip);
-                
+
                 // T_058: Draw tooltip on hover
                 CardTooltip_Draw(cardTooltip, game);
-                
+
                 // T_054: Process drag-drop logic BEFORE clearing drag state
                 update_cardui_drop(game, cardUiActions, dragState);
-                
-                // Update drag state AFTER drop logic has processed it
+
+                // Update drag state AFTER drop logic
                 HandPanel_UpdateDrag(dragState);
-                
-                // Wire card UI actions to boss phase management
-                boss.processUi(game, cardUiActions);
+
+                // Now let the boss state machine consume this frame's UI actions
+                boss.update(game, cardUiActions, dt);
 
                 platform.window->EndFrame();
             }

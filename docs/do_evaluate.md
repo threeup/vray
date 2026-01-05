@@ -29,7 +29,7 @@ Each evaluation is self-contained, scored A-F, and includes detailed findings wi
 
 Refer to [templ_implement.md](templ_implement.md) for detailed section-by-section guidance.
 
-**Fill in** [vray_implement.md](vray_implement.md) with:
+**Replace all the main contents of** [vray_implement.md](vray_implement.md) with:
 
 - Correctness, validation, type safety, readability, and red-flag assessment.
 - Validation Gaps, Ownership/Const Issues, and Magic Numbers tables.
@@ -40,7 +40,7 @@ Refer to [templ_implement.md](templ_implement.md) for detailed section-by-sectio
 
 Refer to [templ_strategy.md](templ_strategy.md) for detailed section-by-section guidance.
 
-**Fill in** [vray_strategy.md](vray_strategy.md) with:
+**Replace all the main contents of** [vray_strategy.md](vray_strategy.md) with:
 
 - Module organization, design patterns, state management, dependency assessment.
 - State Inventory and Abstraction Seams inventory tables.
@@ -51,7 +51,7 @@ Refer to [templ_strategy.md](templ_strategy.md) for detailed section-by-section 
 
 Refer to [templ_vision.md](templ_vision.md) for detailed section-by-section guidance.
 
-**Fill in** [vray_vision.md](vray_vision.md) with:
+**Replace all the main contents of** [vray_vision.md](vray_vision.md) with:
 
 - Feature completeness matrix, input/UX grades, error handling assessment.
 - Adoption blockers and performance observations tables.
@@ -61,7 +61,7 @@ Refer to [templ_vision.md](templ_vision.md) for detailed section-by-section guid
 
 ## Step 2: Synthesize Summary Report
 
-**Create** [vray_eval.md](vray_eval.md):
+**Replace all the main contents of** [vray_eval.md](vray_eval.md):
 
 1. **Executive Summary** (paragraph): Integrate key findings from all three evals; overall project health assessment.
 2. **Scorecard** (table): Overall grades for Vision, Strategy, Implement; highlight hot areas.

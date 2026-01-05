@@ -93,7 +93,7 @@ void draw_playable_card(const PlayableCardUI& cardUI, const Card* card, bool isD
     }
 }
 
-void HandPanel_Draw(const Rectangle& handRect, Game& game, DragState& drag, UiActions& actions, CardTooltip& tooltip) {
+void HandPanel_Draw(const Rectangle& handRect, Game& game, DragState& drag, CardActions& actions, CardTooltip& tooltip) {
     // Draw panel background
     DrawRectangleRec(handRect, Color{40, 40, 50, 220});
     DrawRectangleLinesEx(handRect, 2, DARKGRAY);
@@ -239,7 +239,7 @@ void HandPanel_UpdateDrag(DragState& drag) {
 }
 
 // T_059: Draw play turn button
-void draw_play_turn_button(const Rectangle& handRect, Game& game, UiActions& actions) {
+void draw_play_turn_button(const Rectangle& handRect, Game& game, CardActions& actions) {
     // Button positioned at bottom-right of hand panel
     Rectangle buttonRect = {
         handRect.x + handRect.width - 150,
