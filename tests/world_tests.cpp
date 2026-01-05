@@ -4,6 +4,8 @@
 #include "world/world.h"
 #include "app.h"
 #include "platform/platform.h"
+#include "game.h"
+#include "boss.h"
 #include <array>
 
 // Mock AppContext for testing (minimal)
@@ -251,7 +253,12 @@ TEST(WorldSystem, ActorsFlaggedAndPropsExcluded) {
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
     platform.window->Init(200, 150, "actor_flag_test");
 
-    AppContext ctx{platform.window, platform.input, platform.renderer};
+    Game game;
+    init_game(game);
+    Boss boss;
+    boss.begin(game);
+
+    AppContext ctx{platform.window, platform.input, platform.renderer, game, boss};
     ctx.shaders.flat = LoadShader("assets/xflat.vs", "assets/xflat.fs");
 
     World world{};

@@ -142,13 +142,21 @@ void Boss::buildNpcPlan(Game& game) {
     game.lastAiPlanText = format_plan(npcPlan_, game.hand.cards);
 }
 
-void Boss::executePlay(Game& game) {
+bool Boss::executePlay(Game& game) {
     begin_turn(game);
 
     pendingPlayer_ = playerPlan_.assignments;
     pendingNpc_ = npcPlan_.assignments;
     playSubphase_ = 0;
     playSubphaseTime_ = 0.0f;
+
+    if (pendingPlayer_.empty() && pendingNpc_.empty()) {
+        TraceLog(LOG_WARNING, "[Play] No assignments; skipping play phase");
+        finishRound(game);
+        return false;
+    }
+
+    return true;
 }
 
 bool Boss::applyAssignment(Game& game, const PlanAssignment& a) {
@@ -204,6 +212,9 @@ bool Boss::applyAssignment(Game& game, const PlanAssignment& a) {
 }
 
 void Boss::runPlaySubphase(Game& game) {
+    if (pendingPlayer_.empty() && pendingNpc_.empty()) {
+        return;
+    }
     // Try player assignments first, then NPC
     auto processList = [&](std::vector<PlanAssignment>& list) {
         std::vector<PlanAssignment> blocked;
@@ -227,6 +238,23 @@ void Boss::runPlaySubphase(Game& game) {
     }
 
     // After last subphase finishes, logging and cleanup happen in update()
+}
+
+void Boss::finishRound(Game& game) {
+    advance_turn(game);
+
+    game.currentPlan.assignments.clear();
+    game.hand.resetUsage();
+    playerPlan_.assignments.clear();
+    npcPlan_.assignments.clear();
+    pendingPlayer_.clear();
+    pendingNpc_.clear();
+    playerPlanLocked_ = false;
+    npcPlanReady_ = false;
+    playQueued_ = false;
+    playSubphase_ = 0;
+    playSubphaseTime_ = 0.0f;
+    enterPhase(Phase::PlayerSelect);
 }
 
 void Boss::enterPhase(Phase p) {
@@ -261,35 +289,35 @@ void Boss::update(Game& game, float dt) {
             playQueued_ = true;
         }
         break;
-    case Phase::Play:
+    case Phase::Play: {
+        constexpr int kMaxSubphases = 3;
+        constexpr float subphaseDuration = 0.75f;
+        constexpr float kMaxPlayTime = kMaxSubphases * subphaseDuration + 0.5f;
+
         if (playQueued_) {
-            executePlay(game);
+            bool hasWork = executePlay(game);
             playQueued_ = false;
+            if (!hasWork) {
+                break;
+            }
         }
-        // Execute timed subphases of 0.75s each
+
         playSubphaseTime_ += dt;
-        const float subphaseDuration = 0.75f;
-        while (playSubphase_ < 3 && playSubphaseTime_ >= subphaseDuration) {
+        while (playSubphase_ < kMaxSubphases && playSubphaseTime_ >= subphaseDuration) {
             runPlaySubphase(game);
             playSubphase_++;
             playSubphaseTime_ -= subphaseDuration;
         }
 
-        if (playSubphase_ >= 3) {
-            advance_turn(game);
-
-            // Reset for next round
-            game.currentPlan.assignments.clear();
-            game.hand.resetUsage();
-            playerPlan_.assignments.clear();
-            npcPlan_.assignments.clear();
-            pendingPlayer_.clear();
-            pendingNpc_.clear();
-            playerPlanLocked_ = false;
-            npcPlanReady_ = false;
-            playQueued_ = false;
-            enterPhase(Phase::PlayerSelect);
+        float elapsed = playSubphase_ * subphaseDuration + playSubphaseTime_;
+        bool outOfTime = (elapsed >= kMaxPlayTime) || (phaseTime_ >= kMaxPlayTime);
+        if (playSubphase_ >= kMaxSubphases || outOfTime) {
+            if (!pendingPlayer_.empty() || !pendingNpc_.empty()) {
+                TraceLog(LOG_WARNING, "[Play] Ending with blocked assignments P:%zu N:%zu", pendingPlayer_.size(), pendingNpc_.size());
+            }
+            finishRound(game);
         }
         break;
+    }
     }
 }

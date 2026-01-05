@@ -23,6 +23,27 @@ enum class Occupant {
     Enemy
 };
 
+// Shared ground constants/utilities (keep rendering and placement consistent)
+inline constexpr float kTileSlabThickness = 0.80f; // slab height used when drawing tiles
+
+inline float TileBaseHeight(TileType type) {
+    switch (type) {
+    case TileType::Water: return -0.05f;
+    case TileType::Mountain: return 0.6f;
+    case TileType::Skyscraper: return 0.12f; // footprint pad; building added as prop
+    default: return 0.0f;
+    }
+}
+
+inline float TileSurfaceHeight(TileType type) {
+    return TileBaseHeight(type) + kTileSlabThickness;
+}
+
+inline float ActorBaseHeight(TileType type) {
+    constexpr float kFootClearance = 0.02f; // tiny lift to avoid z-fighting with slabs
+    return TileSurfaceHeight(type) + kFootClearance;
+}
+
 // Represents a single object in the world
 struct WorldEntity {
     Model model;          // The visual representation

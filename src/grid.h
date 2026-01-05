@@ -10,7 +10,7 @@ struct GridCell {
 
 class Grid {
 public:
-    static constexpr int SIZE = 8;
+    static constexpr int SIZE = 12;
     std::array<std::array<GridCell, SIZE>, SIZE> cells;
 
     Grid();

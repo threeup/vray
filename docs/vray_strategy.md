@@ -2,37 +2,37 @@
 
 ## Executive Summary
 
-Architecture is workable for a raylib-driven demo with platform abstraction layers, but relies on direct dependencies, globals/statics, and minimal seams, limiting testability and future evolution.
+Architecture remains demo-grade: clear module split but tight raylib coupling, implicit ownership, and no DI or config/logging seams. Recent boss/play changes add complexity without added tests. Testability and observability are the main risks.
 
 **Overall Grade: C**
 
 ### Key Strengths
 
-- Platform/render/input split is visible (platform/, render/, main loop)
-- Cohesive modules for core rendering and game loop
-- Debt surface area is still small and can be addressed incrementally
-- Build already succeeds with raylib, giving a stable baseline
+- Visible separation (platform/render/game/ui) keeps code discoverable
+- Scope small; debt surface area still containable
+- Recent logging hooks (phase/move) improve diagnosability
+- Build remains stable on raylib baseline
 
 ### Critical Gaps
 
-- Few interface seams; raylib calls are direct, blocking swaps/tests
-- Globals/statics risk hidden coupling and lifecycle hazards
-- No DI pattern; wiring is manual and implicit
-- Limited shared utilities; duplication risk as features grow
+- No abstraction seams over raylib (render/input/assets); hard to test or swap
+- Raw pointers/implicit lifetimes (AppContext game/boss) risk UB
+- Config/logging are ad-hoc; no centralized config or structured logs
+- No DI pattern; wiring is manual; state resets are manual
 
 ## 1. Module Organization & Structure
 
 ### 1.1 Directory Layout & Cohesion
 
-- Layout mirrors platform vs app/game, but utilities are thin.
-- Cohesion is decent per file; some mixed responsibilities remain.
+- Platform/render/game/ui directories map to domains; utils thin.
+- Some files mix orchestration and state (e.g., boss blends scheduling + execution).
 
 **Grade: B-**
 
 ### 1.2 Layer Separation
 
-- UI/logic/data separation exists in principle but cross-cutting concerns (logging/error/config) are embedded.
-- Build targets align to demo scope, not strict layers.
+- Layers exist conceptually, but cross-cutting concerns (error/log/config) are inlined.
+- Build targets follow demo layout, not layered artifacts.
 
 **Grade: C**
 
@@ -40,15 +40,15 @@ Architecture is workable for a raylib-driven demo with platform abstraction laye
 
 ### 2.1 Pattern Usage & Appropriateness
 
-- Pragmatic, minimal patterns; few abstractions over the engine.
-- Keeps complexity low but reduces flexibility.
+- Minimal patterns; recent phase subphases are hand-rolled state machine.
+- Low complexity, but missing guardrails/tests.
 
 **Grade: C+**
 
 ### 2.2 Separation of Concerns & Boundaries
 
-- Some mingling of render/state/input logic; boundaries are porous.
-- Data flow is mostly direct calls; little eventing.
+- Rendering/input are directly consumed by game logic; little inversion.
+- Data flow is imperative; no eventing/commands.
 
 **Grade: C**
 
@@ -56,23 +56,24 @@ Architecture is workable for a raylib-driven demo with platform abstraction laye
 
 ### 3.1 State Strategy
 
-- Mix of statics/singletons and instance objects; lifetimes not always explicit.
-- Const/immutability use is inconsistent.
+- Raw pointers in context ([src/app.h#L120](src/app.h#L120)) for `game`/`boss`; unclear ownership.
+- RAII missing for shaders/models; default-inited handles risk misuse.
+- UI state is mutable/global within `AppContext`.
 
 **Grade: C-**
 
 **State Inventory**
 | Area | Current Pattern | Risk | Suggested Change |
 | ---- | ---------------- | ---- | ---------------- |
-| Render context (shaders/models) | Default-init members in AppContext | Init order hazard; missing validation | Wrap in RAII struct; lazy-init pattern |
-| Game state (game ptr in AppContext) | raw mutable pointer | Lifetime hazard; unclear ownership | unique_ptr or borrowed ref with explicit lifetime |
-| UI toggles (UiState) | Mutable struct in AppContext | State not versioned; no undo | Consider immutable + event log |
-| Config/settings | Hardcoded in main.cpp (window size, FPS) | No centralized config; env brittleness | Extract to config file; env overrides |
+| Game/boss pointers | Raw in AppContext | Lifetime/UB | unique_ptr or references with owner scope |
+| Render handles | Plain structs default-init | Resource leaks/misuse | RAII wrappers + validity checks |
+| Config | Hardcoded in main/render | No overrides/portability | Central config loader |
+| UI flags | Global mutable struct | Hard to reset/test | Encapsulate + reset hooks |
 
 ### 3.2 State Flow & Concurrency
 
-- Mostly single-threaded; mutation is scattered.
-- Reset/reload safety is unclear; test harness resets would be tricky.
+- Single-threaded; mutations scattered across boss/game/ui.
+- Reset between rounds is manual; test harness would be brittle.
 
 **Grade: C-**
 
@@ -80,102 +81,73 @@ Architecture is workable for a raylib-driven demo with platform abstraction laye
 
 ### 4.1 Abstraction Seams
 
-- Raylib/platform services are not behind interfaces; adapters are minimal.
+- Raylib calls are direct ([src/render.cpp](src/render.cpp)), blocking mocks/backends.
+- Input polling is direct; no handler interface.
 
 **Grade: D+**
 
 **Abstraction Seams Inventory**
 | Area | Current Pattern | Risk | Seam/Refactor |
 | ---- | ---------------- | ---- | ------------- |
-| Rendering | Direct raylib (SetRenderTextureActive, DrawModel) | Tight coupling; hard to test | RenderBackend interface + raylib adapter |
-| Input | Direct platform checks (IsKeyDown, etc.) | Hard to mock; no injection | InputHandler interface + test doubles |
-| Assets/IO | Hardcoded paths; direct LoadModel/LoadShader | No error handling; crash on missing | AssetLoader facade + fallback system |
-| Window lifecycle | Platform wraps; AppContext refs it | Circular/implicit ownership | Clear ownership transfer; document lifetimes |
+| Rendering | Direct raylib draw/RT ops | Tight coupling, untestable | RenderBackend + adapter |
+| Input | Direct key polling | Cannot fake in tests | InputHandler interface |
+| Assets | Direct LoadModel/Shader | Crash on missing assets | AssetLoader facade + fallbacks |
+| Window lifecycle | Platform owns, context holds refs | Ownership unclear | Document/encapsulate lifetimes |
 
 ### 4.2 Component Isolation & DI
 
-- Manual wiring; no constructor injection; globals leak dependencies.
-- Hard to isolate modules for tests without refactors.
+- No DI; globals/references passed around; difficult to isolate game/boss for tests.
 
 **Grade: D**
 
 ### 4.3 Global/Hardcoded Dependencies
 
-- Globals/statics likely for input/render context; config is scattered.
+- Hardcoded window/FPS/camera values in [src/main.cpp](src/main.cpp); no config.
 
 **Grade: C-**
 
 ## 5. Code Reuse, Boundaries, and Duplication
 
-### 5.1 Reuse Opportunities
-
-- Common math/util/resource helpers could be centralized; currently ad-hoc.
-
-**Grade: C**
-
-### 5.2 Cross-Module Integrity
-
-- Circulars not evident, but boundaries are informal; public APIs could be tightened.
+- Utilities are minimal; shared math/asset helpers absent; risk of repetition as scope grows.
 
 **Grade: C**
 
 ## 6. Observability & Operability
 
-### 6.1 Telemetry & Logging
-
-- Logging posture is unclear; likely minimal and unstructured.
-- No profiling/metrics hooks for frame time or allocations.
+- Logging improved for phases/moves, but no structured levels/rotation; no metrics/profiling hooks.
 
 **Grade: D+**
-
-### 6.2 Build/Deploy/Runtime Config
-
-- Debug/Release exist; no feature flags; config not centralized.
-
-**Grade: C-**
 
 ## 7. Technical Debt & Roadmap
 
 ### 7.1 Identified Debt Items
 
-| Item                            | Type   | Impact | Unlock                          | Effort | Priority |
-| ------------------------------- | ------ | ------ | ------------------------------- | ------ | -------- |
-| Raw pointers in AppContext      | Design | Med    | RAII/ownership clarity          | Med    | High     |
-| No abstraction over raylib      | Design | High   | Test seams, alternate backends  | Med    | High     |
-| Hardcoded window/FPS constants  | Infra  | Med    | Config system, portability      | Low    | Med      |
-| No error handling in asset load | Design | High   | Graceful fallbacks, logging     | Med    | High     |
-| Scattered magic numbers         | Perf   | Low    | Tuning flexibility, readability | Low    | Med      |
-| No shader/model RAII            | Design | Med    | Easier cleanup, less UB risk    | Low    | Med      |
+| Item                        | Type   | Impact | Unlock                   | Effort | Priority |
+| --------------------------- | ------ | ------ | ------------------------ | ------ | -------- |
+| Raw pointers in AppContext  | Design | Med    | Ownership clarity, tests | Low    | High     |
+| No render/input abstraction | Design | High   | Mocking/backends         | Med    | High     |
+| Hardcoded window/FPS/config | Infra  | Med    | Portability/config       | Low    | Med      |
+| No asset/error handling     | Design | High   | Stability, UX            | Med    | High     |
+| No shader/model RAII        | Design | Med    | Cleanup safety           | Low    | Med      |
 
 **Grade: C**
 
 ### 7.2 Strategic Limitations
 
-- Direct raylib dependency limits engine swaps; acceptable for demo but not for portability.
-- Config/environment handling is ad-hoc, limiting deploy flexibility.
+- Raylib lock-in acceptable for demo; costly to swap without seams.
+- No config/logging infra; scaling to production would need refactor.
 
 **Grade: C**
 
 ### 7.3 Refactoring Roadmap
 
-- Near-Term: Introduce thin interfaces for render/input; wrap raylib calls; add basic logging.
-- Medium: Centralize config; reduce globals; inject deps via constructors; extract shared utils.
-- Long: Tighten module boundaries; consider event bus for input/render notifications; add profiling hooks.
+- Near: Add render/input interfaces; wrap resources in RAII; basic logging/config loader.
+- Medium: Constructor injection for game/boss; split orchestration from state; asset loader with fallbacks.
+- Long: Event/command bus for game actions; profiling/telemetry hooks; module boundary hardening.
 
 **Grade: C+**
 
 ## 8. Summary & Recommendations
 
-### Overall Architecture Assessment
-
-- **Structural Health**: Adequate
-- **Testability**: Poor-Fair
-- **Maintainability**: Medium-Low
-- **Technical Debt**: Manageable but growing
-
-### Key Recommendations
-
-- Add interfaces/adapters around raylib; start constructor injection
-- Inventory and reduce globals/statics; clarify lifetimes
-- Centralize config and logging; add lightweight profiling
-- Extract shared utilities to curb duplication; add seams to enable testing
+- Structural health: Adequate; testability: Poor; maintainability: Medium-Low; debt: Manageable.
+- Priorities: Introduce seams (render/input/assets), fix ownership (unique_ptr/RAII), centralize config/logging, and add basic profiling hooks.

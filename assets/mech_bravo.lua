@@ -1,0 +1,93 @@
+-- Mech configuration overrides. Adjust values to tweak proportions.
+-- Only simple assignments and table fields are supported (no functions).
+
+local scale = 0.4
+
+mech = {
+    scale = scale,
+    stance_width = 0.6,
+
+    foot_width = 0.4,
+    foot_length = 0.9,
+    foot_height = 0.3,
+    foot_bottom_back_frac = 0.5,
+    foot_bottom_front_frac = 0.8,
+    foot_top_back_frac = 0.4,
+    foot_top_front_frac = 0.2,
+    foot_top_width_scale = 0.6,
+    foot_y_offset_frac = 0.3333333,
+    foot_z_offset_frac = 0.1111111,
+
+    ankle_radius = 0.15,
+    lower_leg_bottom = 0.15,
+    lower_leg_top = 0.25,
+    lower_leg_height = 1.40,
+    knee_radius = 0.28,
+    knee_z_offset = 0.1,
+    upper_leg_bottom = 0.25,
+    upper_leg_top = 0.35,
+    upper_leg_height = 1.70,
+    thigh_angle_deg = -15.0,
+    upper_leg_extra_y = 0.05,
+    hip_radius = 0.2,
+    hip_length = 0.4,
+    hip_x_offset = 0.7,
+
+    pelvis_w = 1.2,
+    pelvis_h = 0.4,
+    pelvis_d = 0.8,
+    pelvis_y = 3.2,
+
+    shoulder_sphere_r = 0.3,
+    shoulder_y = 5.1,
+    shoulder_x = 0.85,
+    shoulder_sphere_inset = 0.05,
+
+    shield_angle_deg = -25.0,
+    shield_rot_y_deg = 10.0,
+    shield_dx = 0.1,
+    shield_dy = 0.3,
+    shield_w = 0.6,
+    shield_h = 0.5,
+    shield_t = 0.1,
+    shoulder_cube = 0.4,
+    armature_w = 0.3,
+    armature_h = 0.2,
+    armature_d = 0.2,
+    armature_offset = 0.2,
+
+    plasma_radius = 0.12,
+    plasma_length = 1.2,
+    plasma_y = -0.2,
+    plasma_z = 0.4,
+    plasma_x = 0.3,
+    plasma_x2 = 0.15,
+    plasma_shroud_len_frac = 0.35,
+    plasma_shroud_radius_scale = 1.8,
+    plasma_shroud_taper = 0.9,
+    plasma_shroud_offset_frac = -0.3,
+    plasma_barrel_len_frac = 0.6,
+    plasma_barrel_offset_frac = 0.15,
+    plasma_muzzle_len_frac = 0.1,
+    plasma_muzzle_radius_scale = 1.2,
+    plasma_muzzle_tip_scale = 1.1,
+    plasma_muzzle_offset_frac = 0.45,
+
+    rocket_w = 0.7,
+    rocket_h = 0.8,
+    rocket_d = 0.6,
+    rocket_z = 0.2,
+    rocket_x = 0.3,
+
+    torso_r = 0.75,
+    torso_h = 2.0,
+    torso_y = 4.3,
+
+    neck_r = 0.2,
+    neck_h = 0.35,
+    neck_y = 5.6,
+
+    head_w = 0.45,
+    head_h = 0.5,
+    head_z = 0.12,
+}

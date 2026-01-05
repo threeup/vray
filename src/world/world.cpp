@@ -43,15 +43,6 @@ static Color TileColor(TileType type) {
     }
 }
 
-static float TileHeight(TileType type) {
-    switch (type) {
-    case TileType::Water: return -0.05f;
-    case TileType::Mountain: return 0.6f;
-    case TileType::Skyscraper: return 0.12f; // footprint pad; building added as prop
-    default: return 0.0f;
-    }
-}
-
 static void BuildSampleLayout(World& world) {
     auto idx = [](int x, int y) { return y * World::kTilesWide + x; };
 
@@ -111,7 +102,7 @@ static void PlacePropsFromTiles(World& world, const AppContext& appCtx) {
     for (int y = 0; y < World::kTilesHigh; ++y) {
         for (int x = 0; x < World::kTilesWide; ++x) {
             const TileType t = world.tiles[idx(x, y)];
-            const float baseY = TileHeight(t) + 0.05f; // rest on top of tile slab
+            const float baseY = TileSurfaceHeight(t); // align to slab top
             Vector3 pos = { (x - World::kTilesWide * 0.5f + 0.5f) * World::kTileSize, baseY, (y - World::kTilesHigh * 0.5f + 0.5f) * World::kTileSize };
 
             switch (t) {
@@ -144,14 +135,25 @@ static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
 
     auto tileToEntityPos = [&](int tx, int ty) -> Vector3 {
         Vector3 p = tileToWorldPos(tx, ty);
-        p.y = TileHeight(world.tiles[idx(tx, ty)]) + 0.60f; // lift entity above slab
+        p.y = ActorBaseHeight(world.tiles[idx(tx, ty)]); // align mech feet to slab top with tiny clearance
         return p;
     };
     
-    static Mesh mechMesh = { 0 };
-    if (mechMesh.vertexCount == 0) {
-        mechMesh = CreateMechMesh();
-    }
+    static Mesh mechVariants[3] = { 0 };
+    static bool mechInit[3] = { false, false, false };
+    const char* variantNames[3] = { "alpha", "bravo", "charlie" };
+
+    auto getVariantMesh = [&](int variantIdx) -> Mesh {
+        if (variantIdx < 0 || variantIdx >= 3) variantIdx = 1; // default to bravo
+        if (!mechInit[variantIdx]) {
+            mechVariants[variantIdx] = CreateMechMesh(variantNames[variantIdx]);
+            mechInit[variantIdx] = true;
+        }
+        return mechVariants[variantIdx];
+    };
+
+    int heroCount = 0;
+    int enemyCount = 0;
 
     for (int y = 0; y < World::kTilesHigh; ++y) {
         for (int x = 0; x < World::kTilesWide; ++x) {
@@ -161,9 +163,13 @@ static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
             Vector3 pos = tileToEntityPos(x, y);
 
             if (occ == Occupant::Hero) {
-                AddEntity(world, mechMesh, pos, Color{80, 200, 120, 255}, appCtx.shaders.flat, true);
+                int variantIdx = heroCount % 3; // alpha, bravo, charlie
+                AddEntity(world, getVariantMesh(variantIdx), pos, Color{80, 200, 120, 255}, appCtx.shaders.flat, true);
+                heroCount++;
             } else if (occ == Occupant::Enemy) {
-                AddEntity(world, mechMesh, pos, Color{200, 90, 90, 255}, appCtx.shaders.flat, true);
+                int variantIdx = enemyCount % 3; // alpha, bravo, charlie
+                AddEntity(world, getVariantMesh(variantIdx), pos, Color{200, 90, 90, 255}, appCtx.shaders.flat, true);
+                enemyCount++;
 
                 WorldEntity& enemy = world.entities.back();
                 enemy.isEnemy = true;
@@ -173,6 +179,36 @@ static void PlaceActorsFromOccupants(World& world, const AppContext& appCtx) {
                 enemy.patrolIndex = 0;
             }
         }
+    }
+}
+
+// Place four bright anchor tetrahedrons just outside each board corner for visibility
+static void PlaceCornerAnchors(World& world, const AppContext& appCtx) {
+    static Mesh anchorMesh = { 0 };
+    if (anchorMesh.vertexCount == 0) {
+        anchorMesh = MeshGenerator::createCustomTetrahedron(0.30f, 0); // larger than mech anchor
+    }
+
+    auto tileToWorldPos = [](int tx, int ty) -> Vector3 {
+        return { (tx - World::kTilesWide * 0.5f + 0.5f) * World::kTileSize,
+                 0.0f,
+                 (ty - World::kTilesHigh * 0.5f + 0.5f) * World::kTileSize };
+    };
+
+    const float baseY = ActorBaseHeight(TileType::Dirt);
+    const Color anchorColor{255, 60, 200, 255};
+
+    const int corners[4][2] = {
+        { -1, -1 },
+        { World::kTilesWide, -1 },
+        { -1, World::kTilesHigh },
+        { World::kTilesWide, World::kTilesHigh }
+    };
+
+    for (auto& c : corners) {
+        Vector3 pos = tileToWorldPos(c[0], c[1]);
+        pos.y = baseY;
+        AddEntity(world, anchorMesh, pos, anchorColor, appCtx.shaders.flat, false);
     }
 }
 
@@ -196,6 +232,9 @@ void World_Init(World& world, const AppContext& appCtx) {
 
     // Place actors based on occupant map
     PlaceActorsFromOccupants(world, appCtx);
+
+    // Corner anchors past the board extents for an obvious ground reference
+    PlaceCornerAnchors(world, appCtx);
 
     // Lighting
     // Primary key light (directional)
@@ -250,8 +289,6 @@ void World_Update(World& world, float elapsedTime) {
 void World_DrawGround(const World& world, const AppContext& appCtx) {
     auto idx = [](int x, int y) { return y * World::kTilesWide + x; };
 
-    constexpr float slabThickness = 0.80f;
-
     // Build a reusable tile model once to ensure the flat shader is applied (matte, no specular)
     static Model tileModel = { 0 };
     static bool tileModelInit = false;
@@ -266,12 +303,12 @@ void World_DrawGround(const World& world, const AppContext& appCtx) {
         for (int x = 0; x < World::kTilesWide; ++x) {
             const TileType t = world.tiles[idx(x, y)];
             const Color c = TileColor(t);
-            float h = TileHeight(t);
+            float h = TileBaseHeight(t);
 
-            Vector3 size = { World::kTileSize, slabThickness, World::kTileSize };
-            // Center the slab so its top is at h + slabThickness * 0.5f
+            Vector3 size = { World::kTileSize, kTileSlabThickness, World::kTileSize };
+            // Center the slab so its top is at h + kTileSlabThickness * 0.5f
             Vector3 pos = { (x - World::kTilesWide * 0.5f + 0.5f) * World::kTileSize,
-                            h + slabThickness * 0.5f,
+                            h + kTileSlabThickness * 0.5f,
                             (y - World::kTilesHigh * 0.5f + 0.5f) * World::kTileSize };
 
             // Draw using the flat shader (matte) with non-uniform scale

@@ -1,0 +1,16 @@
+{
+  "window_width": 1024,
+  "window_height": 768,
+  "target_fps": 144,
+  "fullscreen": false,
+  "camera_pitch": 40.0,
+  "camera_yaw": 30.0,
+  "camera_roll": 0.0,
+  "camera_fovy": 55.0,
+  "camera_distance": 25.0,
+  "move_speed": 20.0,
+  "rotation_speed": 3.0,
+  "zoom_speed": 4.0,
+  "zoom_min": 3.0,
+  "zoom_max": 100.0
+}

@@ -2,23 +2,23 @@
 
 ## Executive Summary
 
-VRay ships a responsive raylib-based demo with a solid render/input loop, but product readiness is constrained by thin UX flows, missing persistence, weak error surfacing, and minimal risk-based coverage.
+Playable demo with responsive card/turn loop and recent phase/move logging, but product readiness is blocked by absent persistence, onboarding, and error surfacing; coverage is still zero.
 
 **Overall Grade: C+**
 
 ### Key Strengths
 
-- Core render/input loop feels responsive and stable under typical play
-- Navigation footprint is small; users reach gameplay quickly
-- Visual feedback in-core actions is present (rendered output, camera, movement)
-- Scope is contained, limiting user-facing blast radius of defects
+- Core loop (card → mech assignment → phased play) is responsive and readable
+- New logging for boss phases and mech moves helps diagnostics
+- UI density improved (collapsible panels, plan/assign flow) and usable
+- Scope is tight; defects are constrained
 
 ### Critical Gaps
 
-- Persistence/config absent; sessions cannot be customized or saved
-- No onboarding/tutorial; new users get no guidance or controls reference
-- Error handling is mostly silent; failures likely appear as freezes or crashes
-- Automated coverage is missing on critical paths; high regression risk
+- No settings/save persistence; sessions are ephemeral
+- No onboarding/help; controls and flow are implicit
+- Error handling/surfacing is minimal; failures likely silent
+- No automated coverage on critical loops (render/input/turn)
 
 ## 1. Feature Completeness
 
@@ -26,25 +26,22 @@ VRay ships a responsive raylib-based demo with a solid render/input loop, but pr
 
 **Status Matrix**
 
-| Feature                   | Status (Done/Partial/Missing) | Notes                              | Risk Level |
-| ------------------------- | ----------------------------- | ---------------------------------- | ---------- |
-| Core gameplay/render loop | Done                          | Plays/render loop works via raylib | Med        |
-| UI/menus                  | Partial                       | Minimal menus; limited settings    | Med        |
-| Camera/control settings   | Partial                       | Defaults only; no remap            | Med        |
-| Persistence (save/config) | Missing                       | No save/settings persistence       | High       |
-| Tutorials/onboarding      | Missing                       | No guided help or control list     | Med        |
-| Error feedback            | Missing                       | Silent failures likely             | High       |
+| Feature                   | Status  | Notes                                  | Risk |
+| ------------------------- | ------- | -------------------------------------- | ---- |
+| Card/turn loop            | Done    | Player/NPC plans, phased play substeps | Med  |
+| UI/menus                  | Partial | Core HUD only; minimal settings/help   | Med  |
+| Persistence (config/save) | Missing | No config/save/load                    | High |
+| Onboarding/help           | Missing | No tutorial or controls reference      | High |
+| Error feedback            | Missing | Silent/console-only errors             | High |
 
-- **Happy Path Coverage**: Main loop runs; menu depth shallow.
-- **Optional/Advanced Flows**: Settings, saves, and help are absent.
-- **Content Depth**: Single/demo flow; limited replay drivers.
+- Happy path runs; advanced flows (settings, saves) absent.
+- Content depth is demo-only; replayability limited.
 
 **Grade: C**
 
 ### 1.2 Feature Parity vs Vision
 
-- Behind release-quality bar on saves/settings/help.
-- Deferred scope is not surfaced to users; surprises likely.
+- Behind on saves/settings/help; scope cuts not surfaced to users.
 
 **Grade: C**
 
@@ -52,85 +49,78 @@ VRay ships a responsive raylib-based demo with a solid render/input loop, but pr
 
 ### 2.1 Gameplay Input & Controls
 
-- Responsiveness is good; low latency observed.
-- No remapping; single default binding set.
-- No accessibility toggles (hold/toggle, colorblind cues, haptics).
+- Latency is low; camera/control defaults acceptable.
+- No remapping or accessibility toggles; keyboard-only experience.
 
 **Grade: C+**
 
 ### 2.2 UX Flow & Friction
 
-- Sparse menus; feature discoverability low.
-- No onboarding or first-run hints; learning is trial-and-error.
-- Feedback is present in core play but polish (animations/sfx cues) is light.
-- Performance hitches possible on lower hardware; no loading affordances.
+- Assignment flow is clearer (card selection + mech targets), but no onboarding.
+- Plan panel collapses in non-player phases; feedback limited.
+- No loading/error affordances; minimal polish cues.
 
 **Grade: C**
 
 ### 2.3 Adoption Blockers
 
-- Lack of onboarding and help screens.
-- No settings/persistence to adapt to user hardware/preferences.
-- Fullscreen/window handling and resolution options are unclear.
+- Missing help/onboarding and persistence; silent failures likely.
 
 **Grade: C-**
 
 **Adoption Blockers**
 | Blocker | Impact | Severity (C/H/M/L) | Owner | ETA |
 | ------- | ------ | ------------------ | ----- | --- |
-| No settings/persistence | Users lose prefs every run | High | TBD | P1 |
-| Missing help/onboarding | New users confused on controls | High | TBD | P1 |
-| Silent error failures | Crashes/hangs without feedback | High | TBD | P0 |
-| No automated test coverage | Regression risk blocks shipping | Med | TBD | P0 |
-| No input remap/accessibility | Controller/blind users blocked | Med | TBD | P2 |
+| No settings/persistence | Users lose prefs each run | High | TBD | P1 |
+| Missing help/onboarding | Users guess controls/flow | High | TBD | P1 |
+| Silent error handling | Crashes/hangs without UI | High | TBD | P0 |
+| No automated tests | Regression risk | Med | TBD | P0 |
+| No input remap/a11y | Blocks some users | Med | TBD | P2 |
 
 ## 3. Error Handling & Robustness
 
 ### 3.1 Detection & Validation
 
-- Minimal input/config validation; missing asset handling uncertain.
-- Error catch points not surfaced; likely crash on bad inputs.
+- Limited validation; missing asset/config handling unclear.
+- Errors mostly fall through to crashes or silent fails.
 
 **Grade: D+**
 
 ### 3.2 Failure Modes & Recovery
 
-- Failures likely terminate session; no recovery paths.
-- User messaging is scarce; no guided recovery.
+- No recovery paths; failures end the session.
+- No user-facing error messaging.
 
 **Grade: D**
 
 ### 3.3 Observability
 
-- Logging detail unknown; no crash reporting.
-- Limited breadcrumbs for field repro.
+- New phase/move logs exist, but no structured logging/crash capture.
 
-**Grade: D**
+**Grade: D+**
 
 ## 4. Test Coverage & Risk
 
 ### 4.1 Coverage Mapping
 
-| Component/Feature | Coverage       | Risk If It Breaks | Severity | Priority |
-| ----------------- | -------------- | ----------------- | -------- | -------- |
-| Render/input loop | Partial/manual | High              | High     | High     |
-| UI/menus          | None           | Med               | Med      | Med      |
-| Persistence       | None           | High              | High     | High     |
-| Error paths       | None           | High              | High     | High     |
+| Component/Feature | Coverage    | Risk If It Breaks | Severity | Priority |
+| ----------------- | ----------- | ----------------- | -------- | -------- |
+| Render/input loop | Manual only | High              | High     | High     |
+| Turn planner/play | Manual only | High              | High     | High     |
+| UI flows          | None        | Med               | Med      | Med      |
+| Error paths       | None        | High              | High     | High     |
 
 **Grade: D**
 
 ### 4.2 Test Quality & Depth
 
-- No visible automated tests; reliance on manual ad-hoc checks.
-- No fixtures/fakes for assets or device inputs.
+- No automated tests or fakes; regressions are likely.
 
 **Grade: D**
 
 ### 4.3 Risk Hotspots
 
-- Input/render loop, camera control, any file/asset loading.
-- Recent churn areas (if any) raise risk without tests.
+- Turn/phase controller, render/input loop, asset loading.
 
 **Grade: D+**
 
@@ -138,47 +128,32 @@ VRay ships a responsive raylib-based demo with a solid render/input loop, but pr
 
 ### 5.1 Runtime Stability
 
-- Generally stable in happy path; edge crashes possible on bad data/input.
-- Potential for hangs on missing assets or device edge cases.
+- Stable in happy path; edge failures likely crash/hang.
 
 **Grade: C**
 
 ### 5.2 Data Integrity & Persistence
 
-- No save/load, so integrity risk is low only because feature is missing.
-- Config/state not persisted; settings loss every session.
+- No persistence; settings lost; low integrity risk only because feature absent.
 
 **Grade: C-**
 
 ### 5.3 Performance Observations
 
-| Scenario                  | Symptom                       | Suspected Cause                   | Severity | Repro Steps               |
-| ------------------------- | ----------------------------- | --------------------------------- | -------- | ------------------------- |
-| Asset load on boot        | 0.5-1s hang on startup        | No async load; hardcoded paths    | Med      | Launch app, watch startup |
-| Camera pan in dense scene | Framerate drops under 30fps   | Rendering unoptimized; no culling | Med      | Load scene, pan rapidly   |
-| Rapid input (spam keys)   | Input queue overflow possible | Unbuffered frame-sync input       | Low      | Spam keys during menu nav |
+| Scenario           | Symptom                   | Suspected Cause      | Severity | Repro Steps      |
+| ------------------ | ------------------------- | -------------------- | -------- | ---------------- |
+| Startup load       | Brief pause on asset init | Synchronous loads    | Med      | Launch app       |
+| Rapid camera/input | Possible frame drops      | No culling/profiling | Med      | Pan/zoom rapidly |
 
 ## 6. Product Readiness
 
 ### 6.1 Readiness & Risk
 
-- **Product-Ready**: Needs Work
-- **User Confidence**: Low-Medium
-- **Blocking Issues**: Missing persistence/settings, onboarding/help, error surfacing, zero automated coverage.
+- Product-ready: Needs work; blockers are persistence, onboarding, error UI, tests.
 
 **Grade: C-**
 
-### 6.2 Summary & Recommendations
+### 6.2 Summary
 
-- **What Works Well**: Responsive core loop; stable render path; straightforward controls; contained scope.
-- **What Needs Fixing**: Persistence/settings, onboarding/help, error handling/surfacing, automated smoke/regression tests, input remapping/accessibility.
-- **Recommended Priorities**:
-
-  1. **High**: Add basic error/crash detection and UI feedback; enable player to access help + view controls; capture critical issue logs.
-  2. **High**: Create smoke test suite for render/input loop; add regression checks for stability.
-  3. **Medium**: Implement save/config system; persist window size, camera settings, control bindings.
-  4. **Medium**: Add first-run onboarding flow; brief tutorial on camera/menu navigation.
-  5. **Low**: Implement input remap UI; add accessibility toggles (contrast, hold/toggle, haptics).
-
-- **Effort Estimate**: High-priority items = 2-3 sprints; medium = 3-4 sprints; low = 1-2 sprints.
-- **Owner/Timeline**: Assign PM for requirements; dev for error handling + tests (P0), then saves + onboarding (P1).
+- Works: Core loop responsiveness, simple HUD, new logging.
+- Fix: Error surfacing, persistence/settings, onboarding/help, automated smoke tests, input remap/a11y.

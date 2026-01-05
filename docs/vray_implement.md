@@ -2,108 +2,99 @@
 
 ## Executive Summary
 
-Readable C++ atop raylib with straightforward control/render loops, but validation, type/ownership safety, and automation are light. Hidden globals/statics and magic numbers likely persist, keeping reliability and change safety modest.
+Readable C++ and a clear turn controller, but validation/ownership are weak and automation absent. New play subphases and logging add logic without tests. Hardcoded config and direct raylib use keep reliability modest.
 
 **Overall Grade: C**
 
 ### Key Strengths
 
-- Core loop code is short and easy to follow
-- Rendering/input pathways are implemented clearly with raylib
-- Low algorithmic complexity; few deep call stacks
-- Existing structure makes incremental hardening feasible
+- Core loops are short and readable; new phase/move logs aid debugging
+- Turn/plan logic is explicit; phased play substeps are easy to trace
+- Low algorithmic complexity; contained blast radius
 
 ### Critical Gaps
 
-- Sparse validation and error handling around inputs/resources
-- Inconsistent const/ownership; modern C++ features underused
-- Limited automation: no visible unit/smoke coverage on core paths
-- Potential dead code (unused includes/members) and magic numbers
+- Sparse validation and error handling on inputs/resources
+- Implicit ownership (raw pointers) and missing RAII for graphics handles
+- No automated tests on render/input/turn paths
+- Hardcoded config/magic numbers and direct engine coupling
 
 ## 1. Code Correctness & Quality
 
 ### 1.1 Correctness & Logic
 
-- Happy-path behavior works; edge-path correctness unproven.
-- Minimal assertions/guards around inputs and resource availability.
+- Happy-path turn flow works; edge cases (blocked moves, retries) untested.
+- Subphase retries rely on state mutations without guardrails.
 
 **Grade: C+**
 
 ### 1.2 Validation & Error Paths
 
-- Null/bounds checks are limited; many functions assume valid data.
-- Error propagation is ad-hoc; mix of silent fail and crash.
-- Few defensive invariants; little differentiation of recoverable vs fatal.
+- Minimal bounds/null checks; asset/config failures likely crash/hang.
+- Error propagation is ad-hoc; little user feedback.
 
 **Grade: C-**
 
 **Validation Gaps**
 | Area | Input/Resource | Missing Checks | Severity | Fix Idea |
 | ---- | -------------- | -------------- | -------- | -------- |
-| main.cpp:58 | window resize width/height | bounds check on winW/winH | Med | clamp or validate |
+| Window init ([src/main.cpp](src/main.cpp)) | Width/height/FPS params | Bounds/config validation | Med | Load from config; clamp values |
+| Turn execution ([src/boss.cpp](src/boss.cpp)) | Pending lists/subphase retries | Empty/null plans, max retries | Med | Guard on empty plans; cap retries/log errors |
 
 ### 1.3 Type Safety & Modern Practices
 
-- Const usage inconsistent; some mutable globals/static state.
-- Ownership often implicit; smart pointers/RAII are sparse.
-- Modern C++ conveniences (range-for, enum class, string_view/span) lightly used.
+- Raw pointers for `game`/`boss` ([src/app.h#L120](src/app.h#L120)); no RAII for shaders/models.
+- Const usage uneven; no `enum class` for EntityType.
 
 **Grade: C-**
 
 **Ownership / Const Issues**
 | Symbol | Issue | Risk | Fix |
 | ------ | ----- | ---- | --- |
-| AppContext::game | raw pointer, mutable | lifetime hazard, no ownership semantics | use unique_ptr or lifetime-tied ref |
-| RenderShaders members | default-initialized Shader{0} | no RAII wrapper | wrap in RAII struct |
-| UiState | no const enforcement | state mutation not tracked | make some fields const or use builder |
-| platform in main() | owned via Platform but leaked ref pattern | ownership clarity | consider RAII or explicit ownership transfer |
+| AppContext::game/boss | Raw pointers | Lifetime/UB | unique_ptr or ref with owner scope |
+| RenderShaders handles | Plain Shader {0} | Leak/misuse | RAII wrapper + validity checks |
+| UiState | Global mutable struct | Hard to reset/test | Provide reset ctor; narrow scope |
 
 ### 1.4 Code Quality & Readability
 
-- Naming generally clear; some functions likely longer than needed.
-- Magic numbers appear likely (render params, thresholds) instead of named constants.
-- Comments focus on what, less on why; some areas under-documented.
+- Naming is clear; functions are short. Magic numbers persist (window size, FPS, camera FOV).
 
 **Grade: C+**
 
 **Magic Numbers Tally**
 | Location | Value | Meaning | Replace With |
 | -------- | ----- | ------- | ------------ |
-| main.cpp:17 | 800, 600 | initial window size | WINDOW_WIDTH, WINDOW_HEIGHT const |
-| main.cpp:20 | 60 | target FPS | TARGET_FPS const |
-| main.cpp:29 | 45.0f | camera FOV | CAMERA_FOVY or use constants.h |
-| constants.h | 35.0f, 23.0f, 22.0f | camera pitch/yaw/distance | already good; ensure used |
+| [src/main.cpp](src/main.cpp) | 800, 600, 60, 45.0f | Window size/FPS/FOV | Config constants file |
+| [src/constants.h](src/constants.h) | Camera pitch/yaw/dist literals | Camera defaults | Central config |
 
 ### 1.5 Red Flags
 
-- TODO/FIXME markers and unused headers/members expected; needs cleanup pass.
-- Potential AI/generic comments not tailored to code intent.
-- Copy/paste risk across similar render/input helpers.
+- Direct raylib calls everywhere; no seams for testing.
+- Subphase logic lacks tests and could mask blocked actions.
 
 **Grade: C-**
 
 ## 2. Issues Found
 
-| Category   | File  | Lines | Issue                                     | Sev (C/H/M/L) | Owner | ETA |
-| ---------- | ----- | ----- | ----------------------------------------- | ------------- | ----- | --- |
-| Coverage   | (add) |       | No automated tests on render/input loop   | High          |       |     |
-| Validation | (add) |       | Minimal null/bounds checks on input/state | Med           |       |     |
-| Globals    | (add) |       | Hidden static/global state                | Med           |       |     |
-| Magic nums | (add) |       | Hardcoded tuning constants                | Low           |       |     |
+| Category   | File                             | Lines | Issue                             | Sev  | Owner | ETA |
+| ---------- | -------------------------------- | ----- | --------------------------------- | ---- | ----- | --- |
+| Ownership  | [src/app.h#L120](src/app.h#L120) | 120   | Raw pointers for game/boss        | Med  | TBD   | P0  |
+| Validation | [src/boss.cpp](src/boss.cpp)     | -     | Subphase retries lack guard/limit | Med  | TBD   | P0  |
+| Config     | [src/main.cpp](src/main.cpp)     | -     | Hardcoded window/FPS/FOV          | Low  | TBD   | P1  |
+| Coverage   | Project                          | -     | No tests on render/input/turn     | High | TBD   | P0  |
 
 **Grade: C-**
 
 ## 3. Testing & Tooling
 
-- No unit or integration tests observed; no smoke suite for release builds.
-- Static analysis/sanitizers not evident; risk of silent UB.
-- Formatting consistency acceptable but not enforced automatically.
+- No unit/integration/smoke tests; no sanitizers/CI visible.
+- Logging exists but is unstructured; no assertions/guards.
 
 **Grade: D+**
 
 ## 4. Summary & Recommendations
 
-- **Top 3 Fixes**: Add input/resource validation; replace magic numbers with named constants; clean unused headers/members and TODO debt.
-- **Safety/Robustness**: Introduce asserts/guards, propagate errors with clear handling; reduce globals/statics via scoped ownership and constructors.
-- **Quality/Readability**: Refactor long functions; improve naming for stateful objects; add intent comments where logic is non-obvious.
-- **Follow-up Tests**: Add smoke tests for render/input loop; unit tests for math/utility functions; regression checks for error paths and device edge cases.
+- **Top 3 Fixes**: Add validation/guards in turn/play; replace raw pointers with owned refs/unique_ptr; centralize config constants.
+- **Safety/Robustness**: Add asserts/early returns; wrap shaders/models in RAII; structured logging for errors.
+- **Quality/Readability**: Extract config constants; document play subphase intent; keep functions small.
+- **Follow-up Tests**: Smoke tests for render/input/turn; unit tests for TurnPlan validation and boss subphase retries; regression for blocked-move retry.

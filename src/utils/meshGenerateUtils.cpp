@@ -122,13 +122,13 @@ Mesh createCylinderMesh(float radius, float height, int slices) {
     }
 
     // Bottom cap center
-    int bottomCenterIdx = vertices.size() / 3;
+    int bottomCenterIdx = (int)(vertices.size() / 3);
     vertices.push_back(0.0f);
     vertices.push_back(-halfHeight);
     vertices.push_back(0.0f);
 
     // Top cap center
-    int topCenterIdx = vertices.size() / 3;
+    int topCenterIdx = (int)(vertices.size() / 3);
     vertices.push_back(0.0f);
     vertices.push_back(halfHeight);
     vertices.push_back(0.0f);

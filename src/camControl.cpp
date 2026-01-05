@@ -1,4 +1,5 @@
 #include "camControl.h"
+#include "config.h"
 #include "constants.h"
 #include <cmath>
 #include <raylib.h>
@@ -6,12 +7,18 @@
 // ----------------------------------------------------------------------------------
 // State Management
 // ----------------------------------------------------------------------------------
-// We initialize these DIRECTLY from your constants.h file.
+// We initialize these from constants.h or AppConfig
 // We use static variables so the camera "remembers" its angle/zoom between frames.
 static float currentDistance = CAMERA_DISTANCE;
-// Convert degrees to radians for internal math
 static float currentPitch    = CAMERA_PITCH * (PI / 180.0f); 
 static float currentYaw      = CAMERA_YAW * (PI / 180.0f);
+
+// Mutable sensitivity settings loaded from config
+static float g_moveSpeed = MOVE_SPEED;
+static float g_rotSpeed = ROT_SPEED;
+static float g_zoomSpeed = ZOOM_SPEED;
+static float g_zoomMin = ZOOM_MIN;
+static float g_zoomMax = ZOOM_MAX;
 
 void initializeCamera(Camera3D& camera) {
     // 1. Set static properties from constants
@@ -25,6 +32,36 @@ void initializeCamera(Camera3D& camera) {
     currentPitch    = CAMERA_PITCH * (PI / 180.0f);
     currentYaw      = CAMERA_YAW * (PI / 180.0f);
 
+    // Use default sensitivity values
+    g_moveSpeed = MOVE_SPEED;
+    g_rotSpeed = ROT_SPEED;
+    g_zoomSpeed = ZOOM_SPEED;
+    g_zoomMin = ZOOM_MIN;
+    g_zoomMax = ZOOM_MAX;
+
+    // 3. Force position update immediately so it starts in the right spot
+    updateCamera(camera);
+}
+
+void initializeCameraWithConfig(Camera3D& camera, const AppConfig& config) {
+    // 1. Set static properties from config
+    camera.target = { 0.0f, 0.0f, 0.0f }; // Look at world center initially
+    camera.up = { 0.0f, 1.0f, 0.0f };
+    camera.fovy = config.camera_fovy;
+    camera.projection = CAMERA_PERSPECTIVE;
+
+    // 2. Reset mutable state to config values
+    currentDistance = config.camera_distance;
+    currentPitch    = config.camera_pitch * (PI / 180.0f);
+    currentYaw      = config.camera_yaw * (PI / 180.0f);
+
+    // Load sensitivity from config
+    g_moveSpeed = config.move_speed;
+    g_rotSpeed = config.rotation_speed;
+    g_zoomSpeed = config.zoom_speed;
+    g_zoomMin = config.zoom_min;
+    g_zoomMax = config.zoom_max;
+
     // 3. Force position update immediately so it starts in the right spot
     updateCamera(camera);
 }
@@ -37,22 +74,22 @@ void updateCamera(Camera3D& camera) {
     // ----------------------------------------------------------------------
     float wheel = GetMouseWheelMove();
     if (wheel != 0) {
-        currentDistance -= wheel * ZOOM_SPEED;
+        currentDistance -= wheel * g_zoomSpeed;
         
         // Clamp zoom
-        if (currentDistance < ZOOM_MIN) currentDistance = ZOOM_MIN;
-        if (currentDistance > ZOOM_MAX) currentDistance = ZOOM_MAX;
+        if (currentDistance < g_zoomMin) currentDistance = g_zoomMin;
+        if (currentDistance > g_zoomMax) currentDistance = g_zoomMax;
     }
 
     // ----------------------------------------------------------------------
     // 2. ORBIT ROTATION (Q / E)
     // ----------------------------------------------------------------------
-    if (IsKeyDown(KEY_Q)) currentYaw -= ROT_SPEED * dt;
-    if (IsKeyDown(KEY_E)) currentYaw += ROT_SPEED * dt;
+    if (IsKeyDown(KEY_Q)) currentYaw -= g_rotSpeed * dt;
+    if (IsKeyDown(KEY_E)) currentYaw += g_rotSpeed * dt;
 
     // Optional: Pitch adjustment (R / F) - clamped to prevent flipping
-    if (IsKeyDown(KEY_R)) currentPitch -= ROT_SPEED * dt;
-    if (IsKeyDown(KEY_F)) currentPitch += ROT_SPEED * dt;
+    if (IsKeyDown(KEY_R)) currentPitch -= g_rotSpeed * dt;
+    if (IsKeyDown(KEY_F)) currentPitch += g_rotSpeed * dt;
     
     // Clamp pitch: Keep it between 5 degrees and 89 degrees (never strictly 90)
     float minPitch = 5.0f * (PI / 180.0f);
@@ -75,20 +112,20 @@ void updateCamera(Camera3D& camera) {
     float rightZ = cosf(currentYaw + PI / 2.0f);
 
     if (IsKeyDown(KEY_W)) {
-        camera.target.x -= fwdX * MOVE_SPEED * dt;
-        camera.target.z -= fwdZ * MOVE_SPEED * dt;
+        camera.target.x -= fwdX * g_moveSpeed * dt;
+        camera.target.z -= fwdZ * g_moveSpeed * dt;
     }
     if (IsKeyDown(KEY_S)) {
-        camera.target.x += fwdX * MOVE_SPEED * dt;
-        camera.target.z += fwdZ * MOVE_SPEED * dt;
+        camera.target.x += fwdX * g_moveSpeed * dt;
+        camera.target.z += fwdZ * g_moveSpeed * dt;
     }
     if (IsKeyDown(KEY_A)) {
-        camera.target.x -= rightX * MOVE_SPEED * dt;
-        camera.target.z -= rightZ * MOVE_SPEED * dt;
+        camera.target.x -= rightX * g_moveSpeed * dt;
+        camera.target.z -= rightZ * g_moveSpeed * dt;
     }
     if (IsKeyDown(KEY_D)) {
-        camera.target.x += rightX * MOVE_SPEED * dt;
-        camera.target.z += rightZ * MOVE_SPEED * dt;
+        camera.target.x += rightX * g_moveSpeed * dt;
+        camera.target.z += rightZ * g_moveSpeed * dt;
     }
 
     // ----------------------------------------------------------------------
@@ -109,4 +146,16 @@ void updateCamera(Camera3D& camera) {
     camera.position.x = camera.target.x + offsetX;
     camera.position.y = camera.target.y + vDistance;
     camera.position.z = camera.target.z + offsetZ;
+}
+
+void updateCameraWithConfig(Camera3D& camera, const AppConfig& config) {
+    // Update global settings from config (in case they changed)
+    g_moveSpeed = config.move_speed;
+    g_rotSpeed = config.rotation_speed;
+    g_zoomSpeed = config.zoom_speed;
+    g_zoomMin = config.zoom_min;
+    g_zoomMax = config.zoom_max;
+
+    // Call standard update with new settings
+    updateCamera(camera);
 }

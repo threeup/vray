@@ -52,6 +52,19 @@ struct Hand {
     std::vector<int> availableCardIds() const;
 };
 
+/**
+ * T_051: Deck struct for managing card drawing
+ */
+struct Deck {
+    std::vector<Card> cards;
+
+    void clear();
+    void addCard(const Card& card);
+    Card draw();
+    int remaining() const;
+    void shuffle(uint32_t seed);
+};
+
 struct PlanAssignment {
     int mechId = -1;
     int cardId = -1;

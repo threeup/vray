@@ -8,8 +8,11 @@
 #include "camControl.h"
 #include "render.h"
 #include "ui.h"
+#include "ui/cardui/cardui.h"
+#include "ui/cardui/hand_panel.h"
 #include "world/world.h"
 #include "boss.h"
+#include "config.h"
 #include <cmath>
 #include <algorithm>
 #include <string>
@@ -56,16 +59,7 @@ namespace {
         gx = std::clamp(gx, 0, World::kTilesWide - 1);
         gy = std::clamp(gy, 0, World::kTilesHigh - 1);
 
-        auto tileHeight = [&](TileType t) {
-            switch (t) {
-            case TileType::Water: return -0.05f;
-            case TileType::Mountain: return 0.6f;
-            case TileType::Skyscraper: return 0.12f;
-            default: return 0.0f;
-            }
-        };
-
-        float baseY = tileHeight(world.tiles[idx(gx, gy)]) + 0.60f; // lift actor above slab
+        float baseY = ActorBaseHeight(world.tiles[idx(gx, gy)]); // align mech feet to slab surface
         float wx = (gx - World::kTilesWide * 0.5f + 0.5f) * World::kTileSize;
         float wz = (gy - World::kTilesHigh * 0.5f + 0.5f) * World::kTileSize;
         return {wx, baseY, wz};
@@ -115,33 +109,35 @@ int main() {
     bool fatal = false;
 
     try {
+        // Load configuration from Lua file (falls back to defaults if missing/invalid)
+        AppConfig config = AppConfig::LoadFromFile("vars.lua");
+
         // Create and initialize the platform context
         Platform platform = Platform::CreateRaylibPlatform();
-        platform.window->Init(800, 600, "vray ver1");
+        platform.window->Init(config.window_width, config.window_height, "vray ver1");
 
         SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
-        SetTargetFPS(60);
+        SetTargetFPS(config.target_fps);
 
-        // Create main application context
-        AppContext ctx {
-            .window = platform.window,
-            .input = platform.input,
-            .renderer = platform.renderer
-        };
-
-        // Initialize 3D camera
-        initializeCamera(ctx.camera);
-        ctx.camera.fovy = 45.0f;
-        ctx.camera.projection = CAMERA_PERSPECTIVE;
-
-        // Create Game State
+        // Create Game State and Boss before AppContext
         Game game;
         init_game(game);
-        ctx.game = &game;
 
         Boss boss;
         boss.begin(game);
-        ctx.boss = &boss;
+
+        // Create main application context with non-owning references
+        AppContext ctx {
+            .window = platform.window,
+            .input = platform.input,
+            .renderer = platform.renderer,
+            .game = game,
+            .boss = boss
+        };
+
+        // Initialize 3D camera with config values
+        initializeCameraWithConfig(ctx.camera, config);
+        ctx.camera.projection = CAMERA_PERSPECTIVE;
 
         // Initialize rendering systems
         Render_Init(ctx);
@@ -151,6 +147,8 @@ int main() {
         World_Init(world, ctx);
         
         float totalElapsedTime = 0.0f;
+        DragState dragState;  // T_052: Drag state for card UI
+        CardTooltip cardTooltip;  // T_058: Card tooltip state
 
         try {
             while (!platform.window->ShouldClose()) {
@@ -158,7 +156,7 @@ int main() {
                 totalElapsedTime += dt;
 
                 // --- Update ---
-                updateCamera(ctx.camera);
+                updateCameraWithConfig(ctx.camera, config);
                 update_game(game, dt);
                 World_Update(world, totalElapsedTime);
 
@@ -180,8 +178,24 @@ int main() {
                 platform.window->BeginFrame();
                 Render_DrawFrame(ctx, world);
 
-                UiActions uiActions = UI_Draw(ctx);
-                boss.processUi(game, uiActions);
+                // NEW: Card UI System (T_050-T_059)
+                GameUIPanel uiLayout;
+                uiLayout.metrics = PanelMetrics{10.0f, 12.0f, 4.0f};
+                int currentPhase = static_cast<int>(boss.getPhase());
+                UiActions cardUiActions;
+                draw_cardui(uiLayout, currentPhase, winW, winH, game, cardUiActions, dragState, cardTooltip);
+                
+                // T_058: Draw tooltip on hover
+                CardTooltip_Draw(cardTooltip, game);
+                
+                // T_054: Process drag-drop logic BEFORE clearing drag state
+                update_cardui_drop(game, cardUiActions, dragState);
+                
+                // Update drag state AFTER drop logic has processed it
+                HandPanel_UpdateDrag(dragState);
+                
+                // Wire card UI actions to boss phase management
+                boss.processUi(game, cardUiActions);
 
                 platform.window->EndFrame();
             }

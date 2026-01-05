@@ -32,11 +32,14 @@ add_executable(vray_demo ${VRAY_SOURCES})
 
 add_executable(tests
   tests/smoke_tests.cpp
+  tests/boss_play_tests.cpp
   tests/mech_tests.cpp
   tests/world_tests.cpp
   tests/entity_grid_tests.cpp
   tests/card_game_tests.cpp
+  tests/config_tests.cpp
   src/boss.cpp
+  src/config.cpp
   src/platform/platform.cpp
   src/platform/raylib_window.cpp
   src/platform/raylib_input.cpp
@@ -47,6 +50,7 @@ add_executable(tests
   src/utils/meshProcessUtils.cpp
   src/utils/meshExtraShapeUtils.cpp
   src/utils/meshCompositeUtils.cpp
+  src/utils/luaUtils.cpp
   src/rlights_impl.cpp
   src/world/world.cpp
   src/grid.cpp

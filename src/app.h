@@ -107,18 +107,19 @@ struct UiState {
 };
 
 struct Game; // forward declare until game module exists
+class Boss; // forward declare
 
 struct AppContext {
     // Platform systems (owned by Platform, referenced here)
     std::unique_ptr<WindowInterface>& window;
     std::unique_ptr<InputInterface>& input;
     std::unique_ptr<RendererInterface>& renderer;
+    Game& game; // non-owning reference to game state
+    Boss& boss; // non-owning reference to turn/phase controller
 
     Camera3D camera{};
     RenderTargets targets;
     RenderShaders shaders;
     RenderModels models;
     UiState ui;
-    Game* game = nullptr; // optional hook to game state when introduced
-    Boss* boss = nullptr; // optional hook to turn/phase controller
 };

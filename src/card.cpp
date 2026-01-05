@@ -1,4 +1,5 @@
 #include "card.h"
+#include "ui.h"
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
@@ -148,6 +149,88 @@ std::vector<int> Hand::availableCardIds() const {
         }
     }
     return ids;
+}
+
+// T_051: Deck implementations
+void Deck::clear() {
+    cards.clear();
+}
+
+void Deck::addCard(const Card& card) {
+    cards.push_back(card);
+}
+
+Card Deck::draw() {
+    if (cards.empty()) {
+        return Card{};  // Return empty card if deck is empty
+    }
+    Card drawn = cards.back();
+    cards.pop_back();
+    return drawn;
+}
+
+int Deck::remaining() const {
+    return static_cast<int>(cards.size());
+}
+
+void Deck::shuffle(uint32_t seed) {
+    std::mt19937 rng(seed);
+    std::shuffle(cards.begin(), cards.end(), rng);
+}
+
+// T_057: Calculate mech stats based on assigned cards
+MechStats calculateMechStats(int mechId, const Game& game) {
+    MechStats stats;
+    stats.baseHealth = 100;
+    stats.currentHealth = 100;
+    stats.attackBonus = 0;
+    stats.defenseBonus = 0;
+    stats.synergyText = "";
+    
+    // Get current health from entity
+    for (const auto& entity : game.entities) {
+        if (entity.id == mechId && entity.type == PLAYER) {
+            stats.currentHealth = entity.health;
+            break;
+        }
+    }
+    
+    // Calculate bonuses from assigned cards
+    for (const auto& assignment : game.currentPlan.assignments) {
+        if (assignment.mechId != mechId) continue;
+        
+        // Find the card
+        const Card* card = nullptr;
+        for (const auto& c : game.hand.cards) {
+            if (c.id == assignment.cardId) {
+                card = &c;
+                break;
+            }
+        }
+        if (!card) continue;
+        
+        // Get effect (mirrored or normal)
+        const CardEffect& effect = assignment.useMirror ? card->mirroredEffect : card->effect;
+        
+        // Calculate bonuses
+        if (effect.type == CardType::Damage) {
+            stats.attackBonus += effect.damage;
+        }
+        if (effect.type == CardType::Heal) {
+            stats.defenseBonus += effect.heal;
+        }
+    }
+    
+    // Generate synergy text
+    if (stats.attackBonus > 0 && stats.defenseBonus > 0) {
+        stats.synergyText = "Balanced: +" + std::to_string(stats.attackBonus + stats.defenseBonus);
+    } else if (stats.attackBonus > 0) {
+        stats.synergyText = "Aggressive: +" + std::to_string(stats.attackBonus);
+    } else if (stats.defenseBonus > 0) {
+        stats.synergyText = "Defensive: +" + std::to_string(stats.defenseBonus);
+    }
+    
+    return stats;
 }
 
 CardEffect mirrorEffect(const CardEffect& effect) {

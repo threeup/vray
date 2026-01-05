@@ -12,6 +12,7 @@ struct Game {
     Grid grid;
     std::vector<Entity> entities;
     Hand hand;
+    Deck deck;          // T_051: Separate deck for drawing cards
     TurnPlan currentPlan;
     TurnPlan lastAiPlan;
     std::string lastAiPlanText;

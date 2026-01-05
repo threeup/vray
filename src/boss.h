@@ -37,8 +37,9 @@ private:
     float playSubphaseTime_ = 0.0f;
 
     void buildNpcPlan(Game& game);
-    void executePlay(Game& game);
+    bool executePlay(Game& game);
     void runPlaySubphase(Game& game);
+    void finishRound(Game& game);
     bool applyAssignment(Game& game, const PlanAssignment& a);
     void enterPhase(Phase p);
 };
