@@ -1,5 +1,7 @@
 # vray-demo
 
+[![CI](https://github.com/user/vray/actions/workflows/ci.yml/badge.svg)](https://github.com/user/vray/actions/workflows/ci.yml)
+
 A demo project for a turn-based strategy game where players plan a sequence of actions using cards. Once planned, the sequences for all players are executed simultaneously, and the results play out in a 3D environment.
 
 ## Tech Stack

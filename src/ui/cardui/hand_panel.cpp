@@ -49,7 +49,7 @@ void draw_playable_card(const PlayableCardUI& cardUI, const Card* card, bool isD
     
     // Border
     Color borderColor = cardUI.isHovered ? YELLOW : LIGHTGRAY;
-    DrawRectangleLinesEx(rect, cardUI.isHovered ? 2 : 1, borderColor);
+    DrawRectangleLinesEx(rect, (float)(isDragged ? 3 : cardUI.isHovered ? 2 : 1), borderColor);
     
     // Card name
     int nameX = (int)(rect.x + 4);
@@ -109,7 +109,7 @@ void HandPanel_Draw(const Rectangle& handRect, Game& game, DragState& drag, Card
     const float cardAreaHeight = handRect.height - 42.0f;
     
     // Calculate total width needed and center cards horizontally
-    int numCards = game.hand.cards.size();
+    int numCards = (int)game.hand.cards.size();
     float totalCardWidth = numCards * cardWidth + (numCards - 1) * spacing;
     float startX = handRect.x + (handRect.width - totalCardWidth) / 2.0f;
     
@@ -257,7 +257,7 @@ void draw_play_turn_button(const Rectangle& handRect, Game& game, CardActions& a
     
     // Button border
     Color borderColor = canSubmit ? Color{140, 255, 140, 255} : Color{100, 100, 100, 150};
-    DrawRectangleLinesEx(buttonRect, canSubmit ? 2 : 1, borderColor);
+    DrawRectangleLinesEx(buttonRect, (float)(canSubmit ? 2 : 1), borderColor);
     
     // Button text
     DrawText("PLAY TURN", (int)(buttonRect.x + 12), (int)(buttonRect.y + 6), 12, WHITE);

@@ -21,7 +21,7 @@
 
 ### T_070: Graphics Handles RAII
 
-**Effort:** S | **Status:** Planned
+**Effort:** S | **Status:** ✅ Implemented
 
 Wrap `Shader` and `Model` handles in move-only RAII structs to ensure automatic cleanup on destruction.
 
@@ -79,7 +79,7 @@ bool LoadGame(Game& game, const std::string& filePath);
 
 ### T_075: RenderBackend Interface
 
-**Effort:** M | **Status:** Planned
+**Effort:** M | **Status:** ✅ Implemented
 
 Abstract Raylib calls behind a `RenderBackend` interface to enable headless testing.
 
@@ -104,7 +104,7 @@ public:
 
 ### T_071: CI Pipeline
 
-**Effort:** S | **Status:** Planned
+**Effort:** S | **Status:** ✅ Implemented
 
 GitHub Actions workflow for Windows build and automated testing.
 

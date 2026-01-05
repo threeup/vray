@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        build-type: [Release]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install CMake
+        uses: kitware/cmake-build-action/v4
+
+      - name: Configure CMake
+        run: cmake -B build -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build-type }}
+
+      - name: Run Tests
+        run: ctest --test-dir build -C ${{ matrix.build-type }} --output-on-failure
+
+      - name: Report Build Success
+        if: success()
+        run: echo "✅ Build and tests passed!"
+
+      - name: Report Build Failure
+        if: failure()
+        run: |
+          echo "❌ Build or tests failed!"
+          exit 1

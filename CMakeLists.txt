@@ -38,6 +38,7 @@ add_executable(tests
   tests/entity_grid_tests.cpp
   tests/card_game_tests.cpp
   tests/config_tests.cpp
+  tests/raii_and_backend_tests.cpp
   src/boss/boss.cpp
   src/boss/bossState.h
   src/boss/bossStartupState.cpp
